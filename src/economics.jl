@@ -49,7 +49,7 @@ function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVars
     # number of replacements
     replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime) - 1
     # years that the replacements happen
-    replacement_years = [i*dg.lifetime for i=1:replacements_number]
+    replacement_years = [i*dg.lifetime for i=1:replacements_number]     # TODO verify
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
     
@@ -196,7 +196,7 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
     coe = annualized_cost / opervarsaggr.energy_served
     
     # energy served over the project lifetime
-    energy_served_lifetime = sum(opervarsaggr.energy_served*[1.0; discount_factors[1:length(discount_factors)-1]])
+    energy_served_lifetime = opervarsaggr.energy_served * sum([1.0; discount_factors[1:length(discount_factors)-1]])
     # levelized cost of energy
     lcoe = npc / energy_served_lifetime
     
