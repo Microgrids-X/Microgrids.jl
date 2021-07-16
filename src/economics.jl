@@ -49,7 +49,7 @@ function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVars
     # number of replacements
     replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime) - 1
     # years that the replacements happen
-    replacement_years = [i*dg.lifetime for i=1:replacements_number]     # TODO verify
+    replacement_years = [i*(dg.lifetime/opervarsaggr.DG_operation_hours) for i=1:replacements_number]     # TODO verify
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
     
