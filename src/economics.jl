@@ -54,7 +54,7 @@ function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVars
     replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
     
     # component remaining life at the project end
-    remaining_life = dg.lifetime - (mg.project.lifetime - dg.lifetime * replacements_number)
+    remaining_life = dg.lifetime - (total_DG_operation_hours - dg.lifetime * replacements_number)
     # proportional unitary salvage cost
     proportional_salvage_cost = dg.salvage_cost * remaining_life / dg.lifetime
     
