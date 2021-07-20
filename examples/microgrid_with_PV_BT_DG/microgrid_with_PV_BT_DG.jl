@@ -1,8 +1,11 @@
-using Microgrid
+using Microgrids
 using CSV, DataFrames
 
 # Importing load and solar data
 data = DataFrame(CSV.File("./data/Ouessant_data_2016.csv"))
+
+# Simulation steps
+ntimestep = length(data.Load)
 
 # Components parameters
 # Project
@@ -22,8 +25,11 @@ replacement_cost_PV = 1200.
 salvage_cost_PV = 1200.
 lifetime_PV = 25
 # Battery
+energy_initial = 0.
 energy_max = 6839.87944197573
 energy_min = 0
+power_min = -1.114*energy_max
+power_max = 1.002*energy_max
 loss = 0.05
 investiment_cost_BT = 350.
 om_cost_BT = 10.
