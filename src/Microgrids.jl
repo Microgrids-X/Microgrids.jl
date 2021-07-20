@@ -1,6 +1,6 @@
-module Microgrid
+module Microgrids
 
-export simulate
+export simulate, Project, DieselGenerator, Battery, Photovoltaic, WindPower, Microgrid
 
 include("components.jl")
 include("dispatch.jl")
