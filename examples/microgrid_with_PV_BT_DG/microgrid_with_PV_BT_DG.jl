@@ -2,7 +2,7 @@ using Microgrids
 using CSV, DataFrames
 
 # Importing load and solar data
-data = DataFrame(CSV.File("./data/Ouessant_data_2016.csv"))
+data = DataFrame(CSV.File("$(@__DIR__)/data/Ouessant_data_2016.csv"))
 
 # Simulation steps
 ntimestep = length(data.Load)
