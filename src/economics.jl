@@ -85,20 +85,20 @@ struct MicrogridCosts
 end
 
 # TODO criar uma função annual_costs mais geral, por exemplo para os NonDispatchables, DieselGenerator e Battery
-function annual_costs(nd::NonDispatchables, mg::Microgrid)
+function annual_costs(nd::NonDispatchables, mg_project::Project)
     
     # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg.project.discount_rate)^i) for i=1:mg.project.lifetime ]
+    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
 
     # number of replacements
-    replacements_number = ceil(Integer, mg.project.lifetime/nd.lifetime) - 1
+    replacements_number = ceil(Integer, mg_project.lifetime/nd.lifetime) - 1
     # years that the replacements happen
     replacement_years = [i*nd.lifetime for i=1:replacements_number]
     # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
+    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
     
     # component remaining life at the project end
-    remaining_life = nd.lifetime - (mg.project.lifetime - nd.lifetime * replacements_number)
+    remaining_life = nd.lifetime - (mg_project.lifetime - nd.lifetime * replacements_number)
     # proportional unitary salvage cost
     proportional_salvage_cost = nd.salvage_cost * remaining_life / nd.lifetime
     
@@ -116,7 +116,7 @@ function annual_costs(nd::NonDispatchables, mg::Microgrid)
     if remaining_life == 0
         salvage_cost = 0
     else
-        salvage_cost = proportional_salvage_cost * nd.power_rated * discount_factors[mg.project.lifetime]
+        salvage_cost = proportional_salvage_cost * nd.power_rated * discount_factors[mg_project.lifetime]
     end
     
     total_cost = investment_cost + replacement_cost + om_cost - salvage_cost
@@ -124,20 +124,20 @@ function annual_costs(nd::NonDispatchables, mg::Microgrid)
     return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost]
 end
 
-function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVarsAggr)
+function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
 
     # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg.project.discount_rate)^i) for i=1:mg.project.lifetime ]
+    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
 
     # total diesel generator operation hours over the project lifetime
-    total_DG_operation_hours = mg.project.lifetime * opervarsaggr.DG_operation_hours    
+    total_DG_operation_hours = mg_project.lifetime * opervarsaggr.DG_operation_hours    
 
     # number of replacements
     replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime) - 1
     # years that the replacements happen
     replacement_years = [i*(dg.lifetime/opervarsaggr.DG_operation_hours) for i=1:replacements_number]     # TODO verify
     # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
+    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
     
     # component remaining life at the project end
     remaining_life = dg.lifetime - (total_DG_operation_hours - dg.lifetime * replacements_number)
@@ -158,7 +158,7 @@ function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVars
     if remaining_life == 0
         salvage_cost = 0
     else
-        salvage_cost = proportional_salvage_cost * dg.power_rated * discount_factors[mg.project.lifetime]
+        salvage_cost = proportional_salvage_cost * dg.power_rated * discount_factors[mg_project.lifetime]
     end
 
     fuel_cost = sum(dg.fuel_cost * opervarsaggr.fuel_consumption * discount_factors)
@@ -168,10 +168,10 @@ function annual_costs(dg::DieselGenerator, mg::Microgrid, opervarsaggr::OperVars
     return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost, fuel_cost]
 end
 
-function annual_costs(bt::Battery, mg::Microgrid, opervarsaggr::OperVarsAggr)
+function annual_costs(bt::Battery, mg_project::Project, opervarsaggr::OperVarsAggr)
     
     # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg.project.discount_rate)^i) for i=1:mg.project.lifetime ]
+    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
 
     # minimum battery lifetime between years lifetime and number of cycles lifetime
     if opervarsaggr.annual_throughput == 0
@@ -181,14 +181,14 @@ function annual_costs(bt::Battery, mg::Microgrid, opervarsaggr::OperVarsAggr)
     end
     
     # number of replacements
-    replacements_number = ceil(Integer, mg.project.lifetime/bt_lifetime_min) - 1
+    replacements_number = ceil(Integer, mg_project.lifetime/bt_lifetime_min) - 1
     # years that the replacements happen
     replacement_years = [i*bt_lifetime_min for i=1:replacements_number]
     # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg.project.discount_rate)^i for i in replacement_years]
+    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
     
     # component remaining life at the project end
-    remaining_life = bt_lifetime_min - (mg.project.lifetime - bt_lifetime_min* replacements_number)
+    remaining_life = bt_lifetime_min - (mg_project.lifetime - bt_lifetime_min* replacements_number)
     # proportional unitary salvage cost
     proportional_salvage_cost = bt.salvage_cost * remaining_life / bt_lifetime_min
     
@@ -206,7 +206,7 @@ function annual_costs(bt::Battery, mg::Microgrid, opervarsaggr::OperVarsAggr)
     if remaining_life == 0
         salvage_cost = 0
     else
-        salvage_cost = proportional_salvage_cost * bt.energy_max * discount_factors[mg.project.lifetime]
+        salvage_cost = proportional_salvage_cost * bt.energy_max * discount_factors[mg_project.lifetime]
     end
     
     total_cost = investment_cost + replacement_cost + om_cost - salvage_cost
@@ -250,17 +250,17 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
     # NonDispatchables costs
     for i=1:length(mg.nondispatchables)
         if typeof(mg.nondispatchables[i]) == Photovoltaic
-            PV_total_cost, PV_investment_cost, PV_om_cost, PV_replacement_cost, PV_salvage_cost = annual_costs(mg.nondispatchables[i], mg)
+            PV_total_cost, PV_investment_cost, PV_om_cost, PV_replacement_cost, PV_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)
         elseif typeof(mg.nondispatchables[i]) == WindPower
-            WT_total_cost, WT_investment_cost, WT_om_cost, WT_replacement_cost, WT_salvage_cost = annual_costs(mg.nondispatchables[i], mg)
+            WT_total_cost, WT_investment_cost, WT_om_cost, WT_replacement_cost, WT_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)
         end
     end
 
     # DieselGenerator costs
-    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.dieselgenerator, mg, opervarsaggr)  
+    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.dieselgenerator, mg.project, opervarsaggr)  
     
     # Battery costs
-    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.battery, mg, opervarsaggr)
+    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.battery, mg.project, opervarsaggr)
     
     # SUMMARY
     # total present investment cost    

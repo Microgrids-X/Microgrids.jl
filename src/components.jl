@@ -2,7 +2,7 @@
 # abstract type NonDispatchables <: Components end
 abstract type NonDispatchables end
 
-"Project information."
+"Microgrid project information."
 struct Project
     "lifetime (years)"
     lifetime
