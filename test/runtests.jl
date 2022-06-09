@@ -41,3 +41,68 @@ end
     @test annual_costs(pv, project0) ==                   [24000.0,  10000.0, 6000.0, 12000.0, 4000.0]
     @test round.(annual_costs(pv, project5); digits=2) == [16671.65, 10000.0, 3074.49, 4522.67, 925.51]
 end
+
+@testset "Economics: MG" begin
+    Pload = [1., 1., 1.]
+    
+    lifetime = 25 # yr
+    discount_rate = 0.05
+    timestep = 1 # h
+
+    project0 = Project(lifetime, 0, timestep)
+    project5 = Project(lifetime, discount_rate, timestep)
+
+    power_rated_PV = 6000 # kW
+    fPV = 1.
+    IT = [0, 0.5, 1.0]
+    IS = 1.0
+    investiment_cost_PV = 1200.
+    om_cost_PV = 20.  
+    replacement_cost_PV = 1200.
+    salvage_cost_PV = 1200.
+    lifetime_PV = 25
+
+    photovoltaic = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
+
+    energy_initial = 0.
+    energy_max = 9000
+    energy_min = 0
+    power_min = -1.0*energy_max
+    power_max = +1.0*energy_max
+    loss = 0.05
+    investiment_cost_BT = 350.
+    om_cost_BT = 10.
+    replacement_cost_BT = 350.
+    salvage_cost_BT = 350.
+    lifetime_BT = 15
+    lifetime_thrpt = 3000
+
+    battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
+
+    power_rated_DG = 1800.
+    min_load_ratio = 0
+    F0 = 0.0
+    F1 = 0.240
+    fuel_cost = 1.
+    investiment_cost_DG = 400.
+    om_cost_DG = 0.02
+    replacement_cost_DG = 400.
+    salvage_cost_DG = 400.
+    lifetime_DG = 15000
+
+    dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investiment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
+
+    mg0 = Microgrid(project0, Pload, dieselgenerator, battery, [photovoltaic]);
+    mg5 = Microgrid(project5, Pload, dieselgenerator, battery, [photovoltaic]);
+
+    # Bypass of the operation simulation + aggregation:
+    opervarsaggr = OperVarsAggr(6.774979e6, 0, 0, 0, 0.0, 3327, 670880.8054857135, 1.881753568922309e6, 4569.3, 58.74028997693115)
+
+    costs0 = economics(mg0, opervarsaggr)
+    costs5 = economics(mg5, opervarsaggr)
+    # NPC validations
+    @test round(costs0.npc/1e6; digits=3) == 41.697 # M$, without discount
+    @test round(costs5.npc/1e6; digits=3) == 28.353 # M$, with 5% discount
+    # TODO: test LCOE
+
+end
