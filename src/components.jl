@@ -66,6 +66,44 @@ struct Photovoltaic <: NonDispatchables
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
 end
 
+"Photovoltaic parameters with inverter issues (AC DC)"
+struct PVInverter <: NonDispatchables
+    "Rated power in AC (kW)"
+    power_rated
+    "Inverter loading ratio = PAC_rated/PDC_rated"
+    ILR
+    "Derating factor ∈ [0,1]"
+    derating_factor
+    "global solar irradiance incident on the PV array (kW/m²)"
+    irradiance
+
+    # economics
+    #AC (inverter)
+    "Investiment cost of inverter (currency unit/kW)"
+    investment_cost_AC
+    "Operation and maintenance cost of inverter (currency unit/kW)"
+    om_cost_AC
+    "Replacement cost of inverter (currency unit/kW)"
+    replacement_cost_AC
+    "Salvage cost of inverter (currency unit/kW)"
+    salvage_cost_AC
+    "Lifetime of inverter (years)"
+    lifetime_AC
+    #DC (panels)
+    "Investiment cost of pannels (currency unit/kW)"
+    investment_cost_DC
+    "Operation and maintenance cost of pannels (currency unit/kW)"
+    om_cost_DC
+    "Replacement cost of pannels (currency unit/kW)"
+    replacement_cost_DC
+    "Salvage cost of pannels (currency unit/kW)"
+    salvage_cost_DC
+    "Lifetime of pannels (years)"
+    lifetime_DC
+    # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
+
+end
+
 "Wind turbine parameters."
 struct WindPower <: NonDispatchables
     "Rated power (kW)"
