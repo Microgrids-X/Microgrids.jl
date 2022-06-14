@@ -84,44 +84,60 @@ struct MicrogridCosts
     WT_salvage_cost
 end
 
-# TODO criar uma função annual_costs mais geral, por exemplo para os NonDispatchables, DieselGenerator e Battery
-function annual_costs(nd::NonDispatchables, mg_project::Project)
-    
+
+function annual_costs(mg_project::Project, quantity, investment_price, replacement_price, salvage_price, om_price, fuel_consumption, fuel_price, lifetime)
     # discount factor for each year of the project
     discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
+    sum_discounts = sum(discount_factors)
 
     # number of replacements
-    replacements_number = ceil(Integer, mg_project.lifetime/nd.lifetime) - 1
+    replacements_number = ceil(Integer, mg_project.lifetime/lifetime) - 1
     # years that the replacements happen
-    replacement_years = [i*nd.lifetime for i=1:replacements_number]
+    replacement_years = [i*lifetime for i=1:replacements_number]
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
     
     # component remaining life at the project end
-    remaining_life = nd.lifetime - (mg_project.lifetime - nd.lifetime * replacements_number)
-    # proportional unitary salvage cost
-    proportional_salvage_cost = nd.salvage_cost * remaining_life / nd.lifetime
+    remaining_life = lifetime*(1+replacements_number) - mg_project.lifetime
+    # proportional unitary salvage cost given remaining life
+    salvage_price_effective = salvage_price * remaining_life / lifetime
     
     # present investment cost
-    investment_cost = nd.investment_cost * nd.power_rated
+    investment_cost = investment_price * quantity
     # present operation and maintenance cost
-    om_cost = sum(nd.om_cost * nd.power_rated * discount_factors)
+    om_cost = om_price * quantity * sum_discounts
     # present replacement cost
     if replacements_number == 0
-        replacement_cost = 0
+        replacement_cost = 0.0
     else
-        replacement_cost = sum(nd.replacement_cost * nd.power_rated * replacement_factors)
+        replacement_cost = replacement_price * quantity * sum(replacement_factors)
     end
-    # present salvage cost
-    if remaining_life == 0
-        salvage_cost = 0
-    else
-        salvage_cost = proportional_salvage_cost * nd.power_rated * discount_factors[mg_project.lifetime]
-    end
-    
-    total_cost = investment_cost + replacement_cost + om_cost - salvage_cost
+    # Salvage cost (<0)
+    salvage_cost = -salvage_price_effective * quantity * discount_factors[mg_project.lifetime]
 
-    return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost]
+    if fuel_consumption > 0.0
+        fuel_cost = fuel_price * fuel_consumption * sum_discounts
+    else
+        fuel_cost = 0.0
+    end
+
+    total_cost = investment_cost + replacement_cost + om_cost + fuel_cost + salvage_cost
+
+    return ComponentCosts(total_cost, investment_cost, replacement_cost, om_cost, fuel_cost, salvage_cost)
+end
+
+"""costs for NonDispatchables (PV, wind...) components"""
+function annual_costs(nd::NonDispatchables, mg_project::Project)
+    c = annual_costs(
+        mg_project,
+        nd.power_rated,
+        nd.investment_cost,
+        nd.replacement_cost,
+        nd.salvage_cost,
+        nd.om_cost,
+        0.0, 0.0,
+        nd.lifetime)
+    return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 
 function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
