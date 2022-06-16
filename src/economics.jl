@@ -185,49 +185,25 @@ function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::Op
 end
 
 function annual_costs(bt::Battery, mg_project::Project, opervarsaggr::OperVarsAggr)
-    
-    # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
-
-    # minimum battery lifetime between years lifetime and number of cycles lifetime
-    if opervarsaggr.annual_throughput == 0
-        bt_lifetime_min = bt.lifetime
+    if opervarsaggr.annual_throughput > 0.0
+        lifetime = min(
+            bt.energy_max * bt.lifetime_throughput/opervarsaggr.annual_throughput, # cycling lifetime
+            bt.lifetime # calendar lifetime
+        )
     else
-        bt_lifetime_min = minimum( [(bt.energy_max * bt.lifetime_throughput/opervarsaggr.annual_throughput), bt.lifetime] )
+        lifetime = bt.lifetime
     end
     
-    # number of replacements
-    replacements_number = ceil(Integer, mg_project.lifetime/bt_lifetime_min) - 1
-    # years that the replacements happen
-    replacement_years = [i*bt_lifetime_min for i=1:replacements_number]
-    # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
-    
-    # component remaining life at the project end
-    remaining_life = bt_lifetime_min - (mg_project.lifetime - bt_lifetime_min* replacements_number)
-    # proportional unitary salvage cost
-    proportional_salvage_cost = bt.salvage_cost * remaining_life / bt_lifetime_min
-    
-    # present investment cost
-    investment_cost = bt.investment_cost * bt.energy_max
-    # present operation and maintenance cost
-    om_cost = sum(bt.om_cost * bt.energy_max * discount_factors)
-    # present replacement cost
-    if replacements_number == 0
-        replacement_cost = 0
-    else
-        replacement_cost = sum(bt.replacement_cost * bt.energy_max * replacement_factors)
-    end
-    # present salvage cost
-    if remaining_life == 0
-        salvage_cost = 0
-    else
-        salvage_cost = proportional_salvage_cost * bt.energy_max * discount_factors[mg_project.lifetime]
-    end
-    
-    total_cost = investment_cost + replacement_cost + om_cost - salvage_cost
-
-    return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost]
+    c = annual_costs(
+        mg_project,
+        bt.energy_max,
+        bt.investment_cost,
+        bt.replacement_cost,
+        bt.salvage_cost,
+        bt.om_cost,
+        0.0, 0.0,
+        lifetime)
+    return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 
 """
