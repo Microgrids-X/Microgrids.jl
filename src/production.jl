@@ -8,7 +8,20 @@ function production(photovoltaic::Photovoltaic)
                    (photovoltaic.IT ./ photovoltaic.IS)
     return power_output
 end
+"""
+    production(photovoltaic::PVInverter)
 
+Return the power output of the `PVInverter` source.
+"""
+function production(PVInverter::PVInverter)
+    PDC_rated=PVInverter.ILR*PVInverter.power_rated
+    PAC=zeros(Real,length(PVInverter.irradiance))
+    for i=1:length(PVInverter.irradiance)
+        PDC_i=PVInverter.irradiance[i]*PDC_rated*PVInverter.derating_factor
+        PAC[i]=min(PDC_i,PVInverter.power_rated)
+    end
+    return PAC
+end
 """
     production(wind::WindPower)
 
