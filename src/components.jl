@@ -2,7 +2,7 @@
 # abstract type NonDispatchables <: Components end
 abstract type NonDispatchables end
 
-"Project information."
+"Microgrid project information."
 struct Project
     "lifetime (years)"
     lifetime
@@ -220,72 +220,6 @@ struct OperVarsAggr
     power_curtailment_max
     "Ratio between energy supplied by renewables and energy served in one year (%)"
     renewables_rate
-end
-
-# Total costs
-struct TotalCosts
-    # general
-    "Levelized cost of electricity (currency unit)"
-    lcoe
-    "Cost of electricity (currency unit)"
-    coe # annualized
-    "Net present cost (currency unit)"
-    npc
-    "Present investment cost (currency unit)"
-    total_investment_cost
-    "Present replacement cost (currency unit)"
-    total_replacement_cost
-    "Present operation and maintenance cost (currency unit)"
-    total_om_cost
-    "Present salvage cost (currency unit)"
-    total_salvage_cost
-
-    # components
-    "Generator's total present cost (currency unit)"
-    DG_total_cost
-    "Generator's present investment cost (currency unit)"
-    DG_investment_cost
-    "Generator's present replacement cost (currency unit)"
-    DG_replacement_cost
-    "Generator's present operation and maintenance cost (currency unit)"
-    DG_om_cost
-    "Generator's present salvage cost (currency unit)"
-    DG_salvage_cost
-    "Generator's present fuel cost (currency unit)"
-    DG_fuel_cost
-
-    "Battery's total present cost (currency unit)"
-    BT_total_cost
-    "Battery's present investment cost (currency unit)"
-    BT_investment_cost
-    "Battery's present replacement cost (currency unit)"
-    BT_replacement_cost
-    "Battery's present operation and maintenance cost (currency unit)"
-    BT_om_cost
-    "Battery's present salvage cost (currency unit)"
-    BT_salvage_cost
-
-    "Photovoltaic's total present cost (currency unit)"
-    PV_total_cost
-    "Photovoltaic's present investment cost (currency unit)"
-    PV_investment_cost
-    "Photovoltaic's present replacement cost (currency unit)"
-    PV_replacement_cost
-    "Photovoltaic's present operation and maintenance cost (currency unit)"
-    PV_om_cost
-    "Photovoltaic's present salvage cost (currency unit)"
-    PV_salvage_cost
-
-    "Wind turbine's total present cost (currency unit)"
-    WT_total_cost
-    "Wind turbine's present investment cost (currency unit)"
-    WT_investment_cost
-    "Wind turbine's present replacement cost (currency unit)"
-    WT_replacement_cost
-    "Wind turbine's present operation and maintenance cost (currency unit)"
-    WT_om_cost
-    "Wind turbine's present salvage cost (currency unit)"
-    WT_salvage_cost
 end
 
 # Microgrid
