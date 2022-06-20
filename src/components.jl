@@ -80,26 +80,26 @@ struct PVInverter <: NonDispatchables
     # economics
     #AC (inverter)
     "Investiment cost of inverter (currency unit/kW)"
-    investment_cost_AC
+    investment_cost_ac
     "Operation and maintenance cost of inverter (currency unit/kW)"
-    om_cost_AC
+    om_cost_ac
     "Replacement cost of inverter (currency unit/kW)"
-    replacement_cost_AC
+    replacement_cost_ac
     "Salvage cost of inverter (currency unit/kW)"
-    salvage_cost_AC
+    salvage_cost_ac
     "Lifetime of inverter (years)"
-    lifetime_AC
+    lifetime_ac
     #DC (panels)
     "Investiment cost of pannels (currency unit/kW)"
-    investment_cost_DC
+    investment_cost_dc
     "Operation and maintenance cost of pannels (currency unit/kW)"
-    om_cost_DC
+    om_cost_dc
     "Replacement cost of pannels (currency unit/kW)"
-    replacement_cost_DC
+    replacement_cost_dc
     "Salvage cost of pannels (currency unit/kW)"
-    salvage_cost_DC
+    salvage_cost_dc
     "Lifetime of pannels (years)"
-    lifetime_DC
+    lifetime_dc
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
 
 end

@@ -140,6 +140,32 @@ function annual_costs(nd::NonDispatchables, mg_project::Project)
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 
+function annual_costs(pvi::PVInverter, mg_project::Project)
+    c_ac = annual_costs(
+        mg_project,
+        pvi.power_rated,
+        pvi.investment_cost_ac,
+        pvi.replacement_cost_ac,
+        pvi.salvage_cost_ac,
+        pvi.om_cost_ac,
+        0.0, 0.0,
+        pvi.lifetime_ac)
+    c_dc = annual_costs(
+        mg_project,
+        pvi.power_rated*pvi.ILR, #DC Power Rated
+        pvi.investment_cost_dc,
+        pvi.replacement_cost_dc,
+        pvi.salvage_cost_dc,
+        pvi.om_cost_dc,
+        0.0, 0.0,
+        pvi.lifetime_dc)
+    return [c_ac.total + c_dc.total,
+            c_ac.investment + c_dc.investment,
+            c_ac.om + c_dc.om, 
+            c_ac.replacement+c_dc.replacement, 
+            -(c_ac.salvage+c_dc.salvage)]
+end
+
 function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
 
     # discount factor for each year of the project
@@ -241,7 +267,7 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
 
     # NonDispatchables costs
     for i=1:length(mg.nondispatchables)
-        if typeof(mg.nondispatchables[i]) == Photovoltaic
+        if (typeof(mg.nondispatchables[i]) == Photovoltaic) || (typeof(mg.nondispatchables[i]) == PVInverter)
             PV_total_cost, PV_investment_cost, PV_om_cost, PV_replacement_cost, PV_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)
         elseif typeof(mg.nondispatchables[i]) == WindPower
             WT_total_cost, WT_investment_cost, WT_om_cost, WT_replacement_cost, WT_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)

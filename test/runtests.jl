@@ -40,6 +40,60 @@ end
     @test round.(annual_costs(pv, proj5); digits=2) == [16671.65, 10000.0, 3074.49, 4522.67, 925.51]
 end
 
+@testset "Components: PV wth Inverter" begin
+    power_rated_PV = 5 #kW
+    ILR = 1.5
+    derating_factor = 0.9
+    irradiance = [0, 0.5, 1.0]
+    investiment_cost_inverter = 100.
+    om_cost_inverter = 10/6 
+    replacement_cost_inverter = 100.
+    salvage_cost_inverter = 100.
+    lifetime_inverter = 15
+    investiment_cost_panel = 1200. - investiment_cost_inverter
+    om_cost_panel = 20. - om_cost_inverter
+    replacement_cost_panel = 1200. - replacement_cost_inverter
+    salvage_cost_panel = 1200. - salvage_cost_inverter
+    lifetime_panel = 25
+
+    pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
+                    om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
+                    om_cost_panel,replacement_cost_panel,salvage_cost_panel,lifetime_panel)
+    
+    @test pvi.power_rated == power_rated_PV
+    prod=[0.0,0.0,0.0]
+    for i=1:length(irradiance)
+        prod[i] = min(ILR * power_rated_PV * derating_factor * irradiance[i],power_rated_PV)
+    end
+    @test production(pvi) == prod 
+end
+
+@testset "Economics: PV wth Inverter" begin
+    lifetime_mg = 30
+    proj0 = Project(lifetime_mg, 0.00, 1.) 
+
+    power_rated_PV = 5 #kW
+    ILR = 1.5
+    derating_factor = 0.9
+    irradiance = [0, 0.5, 1.0]
+    investiment_cost_inverter = 100.
+    om_cost_inverter = 10/6 
+    replacement_cost_inverter = 100.
+    salvage_cost_inverter = 100.
+    lifetime_inverter = 15
+    investiment_cost_panel = 1200. - investiment_cost_inverter
+    om_cost_panel = 20. - om_cost_inverter
+    replacement_cost_panel = 1200. - replacement_cost_inverter
+    salvage_cost_panel = 1200. - salvage_cost_inverter
+    lifetime_panel = 25
+
+    pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
+                    om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
+                    om_cost_panel,replacement_cost_panel,salvage_cost_panel,lifetime_panel)
+
+    @test annual_costs(pvi, proj0) == [15275.0,8750.0,4375.0,8750.0, 6600.0]
+end
+
 @testset "Economics: Battery" begin
     lifetime_mg = 25 # just a bit more than the battery
     proj0 = Project(lifetime_mg, 0.00, 1.) # no discount
