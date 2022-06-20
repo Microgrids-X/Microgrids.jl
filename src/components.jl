@@ -5,63 +5,63 @@ abstract type NonDispatchables end
 "Microgrid project information."
 struct Project
     "lifetime (years)"
-    lifetime
+    lifetime::Int
     "discount rate ∈ [0,1]"
-    discount_rate
+    discount_rate::Float64
     "time step (h)"
-    timestep
+    timestep::Float64
     # TODO dispatch_type?
 end
 
 "Diesel generator parameters."
 struct DieselGenerator
     "Rated power (kW)"
-    power_rated   # decision variable
+    power_rated::Float64   # decision variable
     "Minimum load ratio ∈ [0,1]"
-    minimum_load_ratio  # ever it is on, it will work at least `min_load_ratio` of the power_max
+    minimum_load_ratio::Float64  # ever it is on, it will work at least `min_load_ratio` of the power_max
     # min_production = min_load_ratio * power_max   # TODO - maybe it's a internal variable
     "Fuel curve intercept coefficient (L/(h × kW))"
-    F0
+    F0::Float64
     "Fuel curve slope (L/(h × kW))"
-    F1
+    F1::Float64
     
     # economics
     "Fuel cost (currency unit/L)"
-    fuel_cost
+    fuel_cost::Float64
     "Investiment cost (currency unit/kW)"
-    investment_cost
+    investment_cost::Float64
     "Operation and maintenance cost (currency unit/(kW.h))"
-    om_cost
+    om_cost::Float64
     "Replacement cost (currency unit/kW)"
-    replacement_cost
+    replacement_cost::Float64
     "Salvage cost (currency unit/kW)"
-    salvage_cost
+    salvage_cost::Float64
     "Lifetime (h)"
-    lifetime
+    lifetime::Float64
 end
 
 "Photovoltaic parameters."
 struct Photovoltaic <: NonDispatchables
     "Rated power (kW)"
-    power_rated   # decision variable
+    power_rated::Float64   # decision variable
     "Derating factor ∈ [0,1]"
-    derating_factor
+    derating_factor::Float64
     "Incident global solar radiation (kW/m²)"
-    IT
+    IT::Vector{Float64}
     "Standard amount of global solar radiation (kW/m²)"
-    IS
+    IS::Float64
 
     # economics
     "Investiment cost (currency unit/kW)"
-    investment_cost
+    investment_cost::Float64
     "Operation and maintenance cost (currency unit/kW)"
-    om_cost
+    om_cost::Float64
     "Replacement cost (currency unit/kW)"
-    replacement_cost
+    replacement_cost::Float64
     "Salvage cost (currency unit/kW)"
-    salvage_cost
+    salvage_cost::Float64
     "Lifetime (years)"
-    lifetime
+    lifetime::Float64
 
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
 end
@@ -69,37 +69,37 @@ end
 "Photovoltaic parameters with inverter issues (AC DC)"
 struct PVInverter <: NonDispatchables
     "Rated power in AC (kW)"
-    power_rated
+    power_rated::Float64
     "Inverter loading ratio = PAC_rated/PDC_rated"
-    ILR
+    ILR::Float64
     "Derating factor ∈ [0,1]"
-    derating_factor
+    derating_factor::Float64
     "global solar irradiance incident on the PV array (kW/m²)"
-    irradiance
+    irradiance::Vector{Float64}
 
     # economics
     #AC (inverter)
     "Investiment cost of inverter (currency unit/kW)"
-    investment_cost_ac
+    investment_cost_ac::Float64
     "Operation and maintenance cost of inverter (currency unit/kW)"
-    om_cost_ac
+    om_cost_ac::Float64
     "Replacement cost of inverter (currency unit/kW)"
-    replacement_cost_ac
+    replacement_cost_ac::Float64
     "Salvage cost of inverter (currency unit/kW)"
-    salvage_cost_ac
+    salvage_cost_ac::Float64
     "Lifetime of inverter (years)"
-    lifetime_ac
+    lifetime_ac::Float64
     #DC (panels)
     "Investiment cost of pannels (currency unit/kW)"
-    investment_cost_dc
+    investment_cost_dc::Float64
     "Operation and maintenance cost of pannels (currency unit/kW)"
-    om_cost_dc
+    om_cost_dc::Float64
     "Replacement cost of pannels (currency unit/kW)"
-    replacement_cost_dc
+    replacement_cost_dc::Float64
     "Salvage cost of pannels (currency unit/kW)"
-    salvage_cost_dc
+    salvage_cost_dc::Float64
     "Lifetime of pannels (years)"
-    lifetime_dc
+    lifetime_dc::Float64
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
 
 end
@@ -107,65 +107,65 @@ end
 "Wind turbine parameters."
 struct WindPower <: NonDispatchables
     "Rated power (kW)"
-    power_rated
+    power_rated::Float64
     "Cut-in speed (m/s)"
-    U_cut_in
+    U_cut_in::Float64
     "Cut-out speed (m/s)"
-    U_cut_out
+    U_cut_out::Float64
     "Rated speed (m/s)"
-    U_rated
+    U_rated::Float64
     "Wind speed at the measurement height (m/s)"
-    Uanem
+    Uanem::Vector{Float64}
     "Hub height (m)"
-    zhub
+    zhub::Float64
     "Measurement height (m)"
-    zanem
+    zanem::Float64
     "Roughness length (m)"
-    z0
+    z0::Float64
     # TODO rho
     # TODO rho0
 
     # economics
     "Investiment cost (currency unit/kW)"
-    investment_cost
+    investment_cost::Float64
     "Operation and maintenance cost (currency unit/kW)"
-    om_cost
+    om_cost::Float64
     "Replacement cost (currency unit/kW)"
-    replacement_cost
+    replacement_cost::Float64
     "Salvage cost (currency unit/kW)"
-    salvage_cost
+    salvage_cost::Float64
     "Lifetime (years)"
-    lifetime
+    lifetime::Float64
 end
 
 "Battery parameters."
 struct Battery
     "Initial energy (kWh)"
-    energy_initial
+    energy_initial::Float64
     "Rated energy capacity (kWh)"
-    energy_max    # Eb_max
+    energy_max::Float64    # Eb_max
     "Minimum energy level (kWh)"
-    energy_min    # Eb_min  TODO - it could be the minimum state of charge too
+    energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
     "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
-    power_min     # Pb_min - charge (negative)
+    power_min::Float64     # Pb_min - charge (negative)
     "Maximum discharge power (kW)"
-    power_max     # Pb_max - discharge
+    power_max::Float64     # Pb_max - discharge
     "Linear loss factor ∈ [0,1]"
-    loss
+    loss::Float64
 
     # economics
     "Investiment cost (currency unit/kWh)"
-    investment_cost
+    investment_cost::Float64
     "Operation and maintenance cost (currency unit/kWh)"
-    om_cost
+    om_cost::Float64
     "Replacement cost (currency unit/kWh)"
-    replacement_cost
+    replacement_cost::Float64
     "Salvage cost (currency unit/kWh)"
-    salvage_cost
+    salvage_cost::Float64
     "Lifetime (years)"
-    lifetime
+    lifetime::Float64
     "Maximum number of cycles"
-    lifetime_throughput  # max throughput
+    lifetime_throughput::Float64  # max throughput
 end
 
 # Operation variables - Trajectory
@@ -225,7 +225,7 @@ end
 # Microgrid
 struct Microgrid
     project::Project
-    power_load
+    power_load::Vector{Float64}
     dieselgenerator::DieselGenerator
     # photovoltaic::Photovoltaic
     # windpower::WindPower

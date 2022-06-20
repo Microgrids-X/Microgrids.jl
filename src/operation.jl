@@ -19,15 +19,16 @@ function operation(mg::Microgrid)
 
     # variables initialization
     stepsnumber = length(mg.power_load)
-    power_net_load = zeros(Real,stepsnumber)   # TODO - change Real to typeof(...)
-    Pgen = zeros(Real,stepsnumber)
-    Ebatt = zeros(Real,stepsnumber+1)
+    T = Float64 # TODO: use some typeof call instead. But typeof which variable...?
+    power_net_load = zeros(T,stepsnumber)
+    Pgen = zeros(T,stepsnumber)
+    Ebatt = zeros(T,stepsnumber+1)
     Ebatt[1] = mg.battery.energy_initial
-    Pbatt = zeros(Real,stepsnumber)
-    Pbatt_dmax = zeros(Real,stepsnumber)
-    Pbatt_cmax = zeros(Real,stepsnumber)
-    Pcurt = zeros(Real,stepsnumber)
-    Pshed = zeros(Real,stepsnumber)
+    Pbatt = zeros(T,stepsnumber)
+    Pbatt_dmax = zeros(T,stepsnumber)
+    Pbatt_cmax = zeros(T,stepsnumber)
+    Pcurt = zeros(T,stepsnumber)
+    Pshed = zeros(T,stepsnumber)
 
     for i=1:stepsnumber
         # battery limits

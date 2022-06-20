@@ -16,7 +16,8 @@ Return the power output of the `photovoltaic` source.
 """
 function production(photovoltaic::PVInverter)
     PDC_rated=photovoltaic.ILR*photovoltaic.power_rated
-    PAC=zeros(Real,length(photovoltaic.irradiance))
+    T = typeof(PDC_rated)
+    PAC=zeros(T, length(photovoltaic.irradiance))
     for i=1:length(photovoltaic.irradiance)
         PDC_i=photovoltaic.irradiance[i]*PDC_rated*photovoltaic.derating_factor
         PAC[i]=min(PDC_i,photovoltaic.power_rated)
