@@ -61,14 +61,14 @@ end
     batt = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
 
     # Fake operation data: 1k cycles/year, 
-    aggr0C  = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,    0., 0., 0.)
-    aggr100C  = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,  100., 0., 0.) # not enough cycles to reduce the lifetime
-    aggr1kC = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,  300.0*energy_max, 0., 0.) # lifetime reduced to 3000/300 = 10 yr
+    aggr0C   = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,    0., 0., 0.)
+    aggr100C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 100.0*energy_max, 0., 0.) # not enough cycles to reduce the lifetime
+    aggr300C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 300.0*energy_max, 0., 0.) # lifetime reduced to 3000/300 = 10 yr
 
     # no discount, with increasing amount of cycling
     @test annual_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
     @test annual_costs(batt, proj0, aggr100C) == [2660.0, 700.0, 1750.0,  630.0, 420.0]
-    @test annual_costs(batt, proj0, aggr1kC) ==  [3430.0, 700.0, 1750.0, 1260.0, 280.0]
+    @test annual_costs(batt, proj0, aggr300C) == [3430.0, 700.0, 1750.0, 1260.0, 280.0]
     # with discount
     @test round.(annual_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
 end
