@@ -169,29 +169,29 @@ struct Battery
 end
 
 # Operation variables - Trajectory
-struct OperVarsTraj
+struct OperVarsTraj{T<:Real}
     # load
     #= "Net load at each time instant after using the renewables power (kW)"
     Pnl_req =#
     "Net load at each time instant after dispatch (kW)"
-    power_net_load
+    power_net_load::Vector{T}
     "Unmet load/Load shedding power at each time instant (kW)"
-    power_shedding
+    power_shedding::Vector{T}
     # diesel generator
     "Diesel generator power at each time instant (kW)"
-    Pgen
+    Pgen::Vector{T}
     # battery
     "Battery energy at each time instant (kWh)"
-    Ebatt
+    Ebatt::Vector{T}
     "Battery power at each time instant (kW)"
-    Pbatt
+    Pbatt::Vector{T}
     "Maximum battery discharge power at time t (kW)"
-    Pbatt_dmax
+    Pbatt_dmax::Vector{T}
     "Maximum battery charge power at time t (kW)"
-    Pbatt_cmax
+    Pbatt_cmax::Vector{T}
     # renewables sources
     "Renewables curtailment power at each time instant (kW)"
-    power_curtailment
+    power_curtailment::Vector{T}
 end
 
 # Operation variables - Aggregation
@@ -230,5 +230,5 @@ struct Microgrid
     # photovoltaic::Photovoltaic
     # windpower::WindPower
     battery::Battery
-    nondispatchables::Vector{NonDispatchables}
+    nondispatchables #::Vector{NonDispatchables}
 end

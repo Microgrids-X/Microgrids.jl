@@ -7,14 +7,14 @@ hourly operation variables `OperVarsTraj`.
 function operation(mg::Microgrid)
     # photovoltaic production over one year
     # photovoltaic_production = production(mg.photovoltaic)
-    renewables_production = hcat(collect(production(nd) for nd in mg.nondispatchables)...)
+    renewables_production = collect(production(nd) for nd in mg.nondispatchables)
 
     # wind turbine production over one year
     # windpower_production = production(mg.windpower)
 
     # power balance before battery+generator
     # renewable_production = photovoltaic_production + windpower_production
-    total_renewables_production = sum(renewables_production; dims=2)
+    total_renewables_production = sum(renewables_production)::Vector{Float64}
     power_net_load_requested = mg.power_load - total_renewables_production
 
     # variables initialization
