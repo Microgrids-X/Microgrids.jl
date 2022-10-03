@@ -66,12 +66,15 @@ print("timing of simulate(mg):")
 
 function simulate_time(mg)
     # Run the microgrid operation
+    print("- operation:")
     opervarstraj = @btime operation($mg)
 
     # Aggregate the operation variables
+    print("- aggregation:")
     opervarsaggr = @btime aggregation($mg, $opervarstraj)
 
     # Eval the microgrid costs
+    print("- economics:")
     costs = @btime economics($mg, $opervarsaggr)
 
     return (opervarstraj = opervarstraj, opervarsaggr = opervarsaggr, costs = costs)
