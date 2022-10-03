@@ -46,8 +46,8 @@ using ForwardDiff
     # Now test the finite difference approx of the gradient
     @test round.(grad_approx; digits=3) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
 
-    # raises MethodError: no method matching Float64(::ForwardDiff.Dual{...}...)
-    @test_throws MethodError ForwardDiff.gradient(sim_npc, x)
+    # raises TypeError in operation.jl:17 (when casting total_renewables_production to Float64)
+    @test_throws TypeError ForwardDiff.gradient(sim_npc, x)
     @test_broken ForwardDiff.gradient(sim_npc, x) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
 
 end

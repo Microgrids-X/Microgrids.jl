@@ -14,9 +14,9 @@ struct Project
 end
 
 "Diesel generator parameters."
-struct DieselGenerator
+struct DieselGenerator{Topt<:Real}
     "Rated power (kW)"
-    power_rated::Float64   # decision variable
+    power_rated::Topt   # decision variable
     "Minimum load ratio ∈ [0,1]"
     minimum_load_ratio::Float64  # ever it is on, it will work at least `min_load_ratio` of the power_max
     # min_production = min_load_ratio * power_max   # TODO - maybe it's a internal variable
@@ -24,7 +24,7 @@ struct DieselGenerator
     F0::Float64
     "Fuel curve slope (L/(h × kW))"
     F1::Float64
-    
+
     # economics
     "Fuel cost (currency unit/L)"
     fuel_cost::Float64
@@ -41,9 +41,9 @@ struct DieselGenerator
 end
 
 "Photovoltaic parameters."
-struct Photovoltaic <: NonDispatchables
+struct Photovoltaic{Topt<:Real} <: NonDispatchables
     "Rated power (kW)"
-    power_rated::Float64   # decision variable
+    power_rated::Topt   # decision variable
     "Derating factor ∈ [0,1]"
     derating_factor::Float64
     "Incident global solar radiation (kW/m²)"
@@ -67,11 +67,11 @@ struct Photovoltaic <: NonDispatchables
 end
 
 "Photovoltaic parameters with inverter issues (AC DC)"
-struct PVInverter <: NonDispatchables
+struct PVInverter{Topt<:Real} <: NonDispatchables
     "Rated power in AC (kW)"
-    power_rated::Float64
+    power_rated::Topt
     "Inverter loading ratio = PAC_rated/PDC_rated"
-    ILR::Float64
+    ILR::Topt
     "Derating factor ∈ [0,1]"
     derating_factor::Float64
     "global solar irradiance incident on the PV array (kW/m²)"
@@ -105,9 +105,9 @@ struct PVInverter <: NonDispatchables
 end
 
 "Wind turbine parameters."
-struct WindPower <: NonDispatchables
+struct WindPower{Topt<:Real} <: NonDispatchables
     "Rated power (kW)"
-    power_rated::Float64
+    power_rated::Topt
     "Cut-in speed (m/s)"
     U_cut_in::Float64
     "Cut-out speed (m/s)"
@@ -139,11 +139,11 @@ struct WindPower <: NonDispatchables
 end
 
 "Battery parameters."
-struct Battery
+struct Battery{Topt<:Real}
     "Initial energy (kWh)"
     energy_initial::Float64
     "Rated energy capacity (kWh)"
-    energy_max::Float64    # Eb_max
+    energy_max::Topt    # Eb_max
     "Minimum energy level (kWh)"
     energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
     "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
@@ -223,12 +223,12 @@ struct OperVarsAggr
 end
 
 # Microgrid
-struct Microgrid
+struct Microgrid{Topt<:Real}
     project::Project
     power_load::Vector{Float64}
-    dieselgenerator::DieselGenerator
+    dieselgenerator::DieselGenerator{Topt}
     # photovoltaic::Photovoltaic
     # windpower::WindPower
-    battery::Battery
+    battery::Battery{Topt}
     nondispatchables #::Vector{NonDispatchables}
 end
