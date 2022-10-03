@@ -10,14 +10,19 @@ This setting can have an enourmous influence:
 
 ## Results
 
-timing of simulate(mg):  181.459 μs (163 allocations: 759.03 KiB)
+timing of simulate(mg):  181.090 μs (165 allocations: 759.12 KiB)
 
 detailed timing of simulate(mg):
-- operation:  137.699 μs (24 allocations: 753.47 KiB)
-- aggregation:  38.350 μs (9 allocations: 144 bytes)
-- economics:  2.740 μs (130 allocations: 5.42 KiB)
+- operation:  136.317 μs (24 allocations: 753.47 KiB)
+- aggregation:  38.359 μs (9 allocations: 144 bytes)
+- economics:  2.940 μs (132 allocations: 5.52 KiB)
 
 ## Changes
+
+### 2022-10-03: Component's size type becomes parametrized
+
+Simulation performance is almost unchanged,
+with only two extra allocations in economics (130 → 132)
 
 ### 2022-10-03: Julia 1.8 update
 
