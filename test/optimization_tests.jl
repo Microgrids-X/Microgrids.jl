@@ -43,11 +43,11 @@ using ForwardDiff
         grad_approx[i] = (sim_npc(x_right) - sim_npc(x_left))/(2*dx[i])
     end
 
-    # Now test the finite difference approx of the gradient
+    # Test the finite difference approx of the gradient against recorded value
     @test round.(grad_approx; digits=3) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
 
-    # raises TypeError in operation.jl:17 (when casting total_renewables_production to Float64)
-    @test_throws TypeError ForwardDiff.gradient(sim_npc, x)
-    @test_broken ForwardDiff.gradient(sim_npc, x) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
+    # Now gradient computation with ForwardDiff:
+    grad_fd = ForwardDiff.gradient(sim_npc, x)
+    @test round.(grad_fd; digits=3) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
 
 end
