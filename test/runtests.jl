@@ -6,7 +6,7 @@ using Test
 include("optimization_tests.jl")
 
 @testset "Components: PV" begin
-    power_rated_PV = 5 # kW
+    power_rated_PV = 5.0 # kW
     fPV = 0.8 # derating in [0,1]
     IT = [0., 0.5, 1.0]
     IS = 1.0
@@ -14,7 +14,7 @@ include("optimization_tests.jl")
     om_cost_PV = 20.
     replacement_cost_PV = 1000. # $/kW
     salvage_cost_PV = 1000.
-    lifetime_PV = 25
+    lifetime_PV = 25.0
     pv = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
 
     @test pv.power_rated == power_rated_PV
@@ -22,11 +22,11 @@ include("optimization_tests.jl")
 end
 
 @testset "Economics: PV" begin
-    lifetime_mg = 30
+    lifetime_mg = 30.
     proj0 = Project(lifetime_mg, 0.00, 1.) # no discount
     proj5 = Project(lifetime_mg, 0.05, 1.) # 5% discount
 
-    power_rated_PV = 10 # kW
+    power_rated_PV = 10. # kW
     fPV = 1.
     IT = [0., 0.5, 1.0]
     IS = 1.0
@@ -34,7 +34,7 @@ end
     om_cost_PV = 20.
     replacement_cost_PV = 1200.
     salvage_cost_PV = 800.
-    lifetime_PV = 20
+    lifetime_PV = 20.
 
     pv = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
 
@@ -43,7 +43,7 @@ end
 end
 
 @testset "Components: PV wth Inverter" begin
-    power_rated_PV = 5 #kW
+    power_rated_PV = 5. #kW
     ILR = 1.5
     derating_factor = 0.9
     irradiance = [0, 0.5, 1.0]
@@ -51,12 +51,12 @@ end
     om_cost_inverter = 10/6
     replacement_cost_inverter = 100.
     salvage_cost_inverter = 100.
-    lifetime_inverter = 15
+    lifetime_inverter = 15.
     investiment_cost_panel = 1200. - investiment_cost_inverter
     om_cost_panel = 20. - om_cost_inverter
     replacement_cost_panel = 1200. - replacement_cost_inverter
     salvage_cost_panel = 1200. - salvage_cost_inverter
-    lifetime_panel = 25
+    lifetime_panel = 25.
 
     pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
                     om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
@@ -74,7 +74,7 @@ end
     lifetime_mg = 30
     proj0 = Project(lifetime_mg, 0.00, 1.)
 
-    power_rated_PV = 5 #kW
+    power_rated_PV = 5. #kW
     ILR = 1.5
     derating_factor = 0.9
     irradiance = [0, 0.5, 1.0]
@@ -82,12 +82,12 @@ end
     om_cost_inverter = 10/6
     replacement_cost_inverter = 100.
     salvage_cost_inverter = 100.
-    lifetime_inverter = 15
+    lifetime_inverter = 15.
     investiment_cost_panel = 1200. - investiment_cost_inverter
     om_cost_panel = 20. - om_cost_inverter
     replacement_cost_panel = 1200. - replacement_cost_inverter
     salvage_cost_panel = 1200. - salvage_cost_inverter
-    lifetime_panel = 25
+    lifetime_panel = 25.
 
     pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
                     om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
@@ -102,17 +102,17 @@ end
     proj5 = Project(lifetime_mg, 0.05, 1.) # 5% discount
 
     energy_initial = 0.
-    energy_max = 7
-    energy_min = 0
+    energy_max = 7.
+    energy_min = 0.
     power_min = -1.0*energy_max
     power_max = +1.0*energy_max
     loss = 0.05
     investiment_cost_BT = 100.
-    om_cost_BT = 10
+    om_cost_BT = 10.
     replacement_cost_BT = 90.
-    salvage_cost_BT = 80
-    lifetime_BT = 20
-    lifetime_thrpt = 3000
+    salvage_cost_BT = 80.
+    lifetime_BT = 20.
+    lifetime_thrpt = 3000.
 
     batt = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
 
