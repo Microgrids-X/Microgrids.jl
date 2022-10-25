@@ -17,6 +17,9 @@ detailed timing of simulate(mg):
 - aggregation:  38.359 μs (9 allocations: 144 bytes)
 - economics:  2.940 μs (132 allocations: 5.52 KiB)
 
+timing of gradient(sim_npc, x):  353.284 μs (181 allocations: 2.75 MiB)
+
+
 ## Changes
 
 ### 2022-10-03: Component's size type becomes parametrized

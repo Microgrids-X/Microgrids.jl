@@ -147,9 +147,9 @@ struct Battery{Topt<:Real}
     "Minimum energy level (kWh)"
     energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
     "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
-    power_min::Float64     # Pb_min - charge (negative)
+    power_min::Topt     # Pb_min - charge (negative)
     "Maximum discharge power (kW)"
-    power_max::Float64     # Pb_max - discharge
+    power_max::Topt     # Pb_max - discharge
     "Linear loss factor ∈ [0,1]"
     loss::Float64
 

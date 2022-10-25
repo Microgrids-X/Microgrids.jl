@@ -14,6 +14,9 @@ using ForwardDiff
         energy_max = x[2]
         power_rated_PV = x[3]
 
+        power_min = -1.0*energy_max
+        power_max = +1.0*energy_max
+
         # Components:
         dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investiment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
         battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
