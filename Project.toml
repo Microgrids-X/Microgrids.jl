@@ -3,3 +3,6 @@ uuid = "bd581358-d3fa-499e-a26e-e70307242c03"
 authors = ["Pierre Haessig <pierre.haessig@centralesupelec.fr>",
            "evelisea <59697806+evelisea@users.noreply.github.com>"]
 version = "0.9.0"
+
+[compat]
+julia = "~1.6"
