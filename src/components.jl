@@ -2,42 +2,111 @@
 # abstract type NonDispatchables <: Components end
 abstract type NonDispatchables end
 
-"Microgrid project information."
+"""
+Microgrid project information
+
+Parameters:
+- lifetime (y)
+- discount rate ∈ [0,1]
+- time step (h)
+- currency: "$", "€"...
+"""
 struct Project
-    "lifetime (years)"
+    "project lifetime (y)"
     lifetime::Int
     "discount rate ∈ [0,1]"
     discount_rate::Float64
     "time step (h)"
     timestep::Float64
-    # TODO dispatch_type?
+    "currency used in price parameters and computed costs"
+    currency::String
 end
 
-"Diesel generator parameters."
-struct DieselGenerator{Topt<:Real}
-    "Rated power (kW)"
-    power_rated::Topt   # decision variable
-    "Minimum load ratio ∈ [0,1]"
-    minimum_load_ratio::Float64  # ever it is on, it will work at least `min_load_ratio` of the power_max
-    # min_production = min_load_ratio * power_max   # TODO - maybe it's a internal variable
-    "Fuel curve intercept coefficient (L/(h × kW))"
-    F0::Float64
-    "Fuel curve slope (L/(h × kW))"
-    F1::Float64
+"""
+Dispatchable power source
+(e.g. Diesel generator, Gas turbine, Fuel cell)
+
+# About the types of the fields
+
+All component parameters should be `Float64` except for the
+*sizing parameter(s)* (here `power_rated`)
+which type is parametrized as `Topt` and may be also `Float64` or
+or any another `Real` type (e.g. ForwardDiff's dual number type)
+"""
+struct DispatchableGenerator{Topt<:Real}
+    # Main technical parameters
+    "rated power (kW)"
+    power_rated::Topt
+    "fuel consumption curve intercept (L/h/kW_max)"
+    fuel_intercept::Float64
+    "fuel consumption curve slope (L/h/kW)"
+    fuel_slope::Float64
+
+    # Main economics parameters
+    "fuel price ($/L)"
+    fuel_price::Float64
+    "initial investiment price ($/kW)"
+    investment_price::Float64
+    "operation & maintenance price ($/kW/h of operation)"
+    om_price_hours::Float64
+    "generator lifetime (h of operation)"
+    lifetime::Float64
+
+    # Secondary technical parameters (which should have a default value)
+    "minimum load ratio ∈ [0,1]"
+    load_ratio_min::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, as a fraction of initial investment price"
+    replacement_price_ratio::Float64
+    "salvage price, as a fraction of initial investment price"
+    salvage_price_ratio::Float64
+    "fuel quantity unit (used in fuel price and consumtion curve parameters)"
+    fuel_unit: str = "L"
+end
+
+
+"""
+Battery energy storage (including AC/DC converter)
+
+Battery dynamics is E(k+1) = E(k) − (P(k) + α|P(k)|).Δt
+where α is a linear loss factor (`loss` field).
+It relates approximately to the roundtrip efficiency η as η = 1−2α.
+
+# About the types of the fields
+
+All component parameters should be `Float64` except for the
+*sizing parameter(s)* (here `power_rated`)
+which type is parametrized as `Topt` and may be also `Float64` or
+or any another `Real` type (e.g. ForwardDiff's dual number type)
+"""
+struct Battery{Topt<:Real}
+    "Initial energy (kWh)"
+    energy_initial::Float64
+    "Rated energy capacity (kWh)"
+    energy_max::Topt    # Eb_max
+    "Minimum energy level (kWh)"
+    energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
+    "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
+    power_min::Topt     # Pb_min - charge (negative)
+    "Maximum discharge power (kW)"
+    power_max::Topt     # Pb_max - discharge
+    "Linear loss factor ∈ [0,1]"
+    loss::Float64
 
     # economics
-    "Fuel cost (currency unit/L)"
-    fuel_cost::Float64
-    "Investiment cost (currency unit/kW)"
-    investment_cost::Float64
-    "Operation and maintenance cost (currency unit/(kW.h))"
-    om_cost::Float64
-    "Replacement cost (currency unit/kW)"
-    replacement_cost::Float64
-    "Salvage cost (currency unit/kW)"
-    salvage_cost::Float64
-    "Lifetime (h)"
+    "initial investiment price ($/kWh)"
+    investment_price::Float64
+    "operation and maintenance price ($/kWh)"
+    om_price::Float64
+    "replacement price ($/kWh)"
+    replacement_price_ratio::Float64
+    "salvage price ($/kWh)"
+    salvage_price_ratio::Float64
+    "lifetime (y)"
     lifetime::Float64
+    "maximum number of cycles"
+    lifetime_throughput::Float64  # max throughput
 end
 
 "Photovoltaic parameters."
@@ -52,15 +121,15 @@ struct Photovoltaic{Topt<:Real} <: NonDispatchables
     IS::Float64
 
     # economics
-    "Investiment cost (currency unit/kW)"
-    investment_cost::Float64
-    "Operation and maintenance cost (currency unit/kW)"
-    om_cost::Float64
-    "Replacement cost (currency unit/kW)"
-    replacement_cost::Float64
-    "Salvage cost (currency unit/kW)"
-    salvage_cost::Float64
-    "Lifetime (years)"
+    "initial investiment price ($/kW)"
+    investment_price::Float64
+    "operation and maintenance price ($/kW)"
+    om_price::Float64
+    "replacement price ($/kW)"
+    replacement_price_ratio::Float64
+    "salvage price ($/kW)"
+    salvage_price_ratio::Float64
+    "lifetime (y)"
     lifetime::Float64
 
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
@@ -79,26 +148,26 @@ struct PVInverter{Topt<:Real} <: NonDispatchables
 
     # economics
     #AC (inverter)
-    "Investiment cost of inverter (currency unit/kW)"
-    investment_cost_ac::Float64
-    "Operation and maintenance cost of inverter (currency unit/kW)"
-    om_cost_ac::Float64
-    "Replacement cost of inverter (currency unit/kW)"
-    replacement_cost_ac::Float64
-    "Salvage cost of inverter (currency unit/kW)"
-    salvage_cost_ac::Float64
-    "Lifetime of inverter (years)"
+    "initial investiment price of inverter ($/kW)"
+    investment_price_ac::Float64
+    "operation and maintenance price of inverter ($/kW)"
+    om_price_ac::Float64
+    "replacement price of inverter ($/kW)"
+    replacement_price_ratio_ac::Float64
+    "salvage price of inverter ($/kW)"
+    salvage_price_ratio_ac::Float64
+    "lifetime of inverter (y)"
     lifetime_ac::Float64
     #DC (panels)
-    "Investiment cost of pannels (currency unit/kW)"
-    investment_cost_dc::Float64
-    "Operation and maintenance cost of pannels (currency unit/kW)"
-    om_cost_dc::Float64
-    "Replacement cost of pannels (currency unit/kW)"
-    replacement_cost_dc::Float64
-    "Salvage cost of pannels (currency unit/kW)"
-    salvage_cost_dc::Float64
-    "Lifetime of pannels (years)"
+    "initial investiment price of pannels ($/kW)"
+    investment_price_dc::Float64
+    "operation and maintenance price of pannels ($/kW)"
+    om_price_dc::Float64
+    "replacement price of pannels ($/kW)"
+    replacement_price_ratio_dc::Float64
+    "salvage price of pannels ($/kW)"
+    salvage_price_ratio_dc::Float64
+    "lifetime of pannels (y)"
     lifetime_dc::Float64
     # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
 
@@ -126,46 +195,16 @@ struct WindPower{Topt<:Real} <: NonDispatchables
     # TODO rho0
 
     # economics
-    "Investiment cost (currency unit/kW)"
-    investment_cost::Float64
-    "Operation and maintenance cost (currency unit/kW)"
-    om_cost::Float64
-    "Replacement cost (currency unit/kW)"
-    replacement_cost::Float64
-    "Salvage cost (currency unit/kW)"
-    salvage_cost::Float64
-    "Lifetime (years)"
+    "initial investiment price ($/kW)"
+    investment_price::Float64
+    "operation and maintenance price ($/kW)"
+    om_price::Float64
+    "replacement price ($/kW)"
+    replacement_price_ratio::Float64
+    "salvage price ($/kW)"
+    salvage_price_ratio::Float64
+    "lifetime (y)"
     lifetime::Float64
-end
-
-"Battery parameters."
-struct Battery{Topt<:Real}
-    "Initial energy (kWh)"
-    energy_initial::Float64
-    "Rated energy capacity (kWh)"
-    energy_max::Topt    # Eb_max
-    "Minimum energy level (kWh)"
-    energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
-    "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
-    power_min::Topt     # Pb_min - charge (negative)
-    "Maximum discharge power (kW)"
-    power_max::Topt     # Pb_max - discharge
-    "Linear loss factor ∈ [0,1]"
-    loss::Float64
-
-    # economics
-    "Investiment cost (currency unit/kWh)"
-    investment_cost::Float64
-    "Operation and maintenance cost (currency unit/kWh)"
-    om_cost::Float64
-    "Replacement cost (currency unit/kWh)"
-    replacement_cost::Float64
-    "Salvage cost (currency unit/kWh)"
-    salvage_cost::Float64
-    "Lifetime (years)"
-    lifetime::Float64
-    "Maximum number of cycles"
-    lifetime_throughput::Float64  # max throughput
 end
 
 # Operation variables - Trajectory
