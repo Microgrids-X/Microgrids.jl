@@ -126,15 +126,15 @@ function annual_costs(mg_project::Project, quantity, investment_price, replaceme
     return ComponentCosts(total_cost, investment_cost, replacement_cost, om_cost, fuel_cost, salvage_cost)
 end
 
-"""costs for NonDispatchables (PV, wind...) components"""
-function annual_costs(nd::NonDispatchables, mg_project::Project)
+"""costs for NonDispatchableSource (PV, wind...) components"""
+function annual_costs(nd::NonDispatchableSource, mg_project::Project)
     c = annual_costs(
         mg_project,
         nd.power_rated,
-        nd.investment_cost,
-        nd.replacement_cost,
-        nd.salvage_cost,
-        nd.om_cost,
+        nd.investment_price,
+        nd.investment_price * nd.replacement_price_ratio,
+        nd.investment_price * nd.salvage_price_ratio,
+        nd.om_price,
         0.0, 0.0,
         nd.lifetime)
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]
@@ -144,19 +144,19 @@ function annual_costs(pvi::PVInverter, mg_project::Project)
     c_ac = annual_costs(
         mg_project,
         pvi.power_rated,
-        pvi.investment_cost_ac,
-        pvi.replacement_cost_ac,
-        pvi.salvage_cost_ac,
-        pvi.om_cost_ac,
+        pvi.investment_price_ac,
+        pvi.investment_price_ac * pvi.replacement_price_ratio,
+        pvi.investment_price_ac * pvi.salvage_price_ratio,
+        pvi.om_price_ac,
         0.0, 0.0,
         pvi.lifetime_ac)
     c_dc = annual_costs(
         mg_project,
-        pvi.power_rated*pvi.ILR, #DC Power Rated
-        pvi.investment_cost_dc,
-        pvi.replacement_cost_dc,
-        pvi.salvage_cost_dc,
-        pvi.om_cost_dc,
+        pvi.power_rated*pvi.ILR, # DC rated power
+        pvi.investment_price_dc,
+        pvi.investment_price_dc * pvi.replacement_price_ratio,
+        pvi.investment_price_dc * pvi.salvage_price_ratio,
+        pvi.om_price_dc,
         0.0, 0.0,
         pvi.lifetime_dc)
     return [c_ac.total + c_dc.total,
@@ -166,7 +166,7 @@ function annual_costs(pvi::PVInverter, mg_project::Project)
             -(c_ac.salvage+c_dc.salvage)]
 end
 
-function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
+function annual_costs(dg::DispatchableGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
 
     # discount factor for each year of the project
     discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
@@ -187,7 +187,7 @@ function annual_costs(dg::DieselGenerator, mg_project::Project, opervarsaggr::Op
     proportional_salvage_cost = dg.salvage_cost * remaining_life / dg.lifetime
 
     # present investment cost
-    investment_cost = dg.investment_cost * dg.power_rated
+    investment_cost = dg.investment_price * dg.power_rated
     # present operation and maintenance cost
     om_cost = sum(dg.om_cost * dg.power_rated * opervarsaggr.DG_operation_hours * discount_factors) # depends on the nb of the DG working Hours
     # present replacement cost
@@ -213,20 +213,20 @@ end
 function annual_costs(bt::Battery, mg_project::Project, opervarsaggr::OperVarsAggr)
     if opervarsaggr.annual_throughput > 0.0
         lifetime = min(
-            bt.energy_max * bt.lifetime_throughput/opervarsaggr.annual_throughput, # cycling lifetime
-            bt.lifetime # calendar lifetime
+            bt.energy_rated * bt.lifetime_cycles/opervarsaggr.annual_throughput, # cycling lifetime
+            bt.lifetime_calendar # calendar lifetime
         )
     else
-        lifetime = bt.lifetime
+        lifetime = bt.lifetime_calendar
     end
 
     c = annual_costs(
         mg_project,
-        bt.energy_max,
-        bt.investment_cost,
-        bt.replacement_cost,
-        bt.salvage_cost,
-        bt.om_cost,
+        bt.energy_rated,
+        bt.investment_price,
+        bt.investment_price * bt.replacement_price_ratio,
+        bt.investment_price * bt.salvage_price_ratio,
+        bt.om_price,
         0.0, 0.0,
         lifetime)
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]

@@ -5,7 +5,7 @@ Return the power output of the `photovoltaic` source.
 """
 function production(photovoltaic::Photovoltaic)
     power_output = photovoltaic.derating_factor * photovoltaic.power_rated *
-                   (photovoltaic.IT ./ photovoltaic.IS)
+                   photovoltaic.irradiance
     return power_output
 end
 

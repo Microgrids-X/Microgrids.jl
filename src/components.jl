@@ -7,7 +7,7 @@ Parameters:
 - lifetime (y)
 - discount rate ∈ [0,1]
 - time step (h)
-- currency: "$", "€"...
+- currency: "\$", "€"...
 """
 struct Project
     "project lifetime (y)"
@@ -41,11 +41,11 @@ struct DispatchableGenerator{Topt<:Real}
     fuel_slope::Float64
 
     # Main economics parameters
-    "fuel price ($/L)"
+    "fuel price (\$/L)"
     fuel_price::Float64
-    "initial investiment price ($/kW)"
+    "initial investiment price (\$/kW)"
     investment_price::Float64
-    "operation & maintenance price ($/kW/h of operation)"
+    "operation & maintenance price (\$/kW/h of operation)"
     om_price_hours::Float64
     "generator lifetime (h of operation)"
     lifetime_hours::Float64
@@ -84,9 +84,9 @@ struct Battery{Topt1<:Real,Topt2<:Real}
     energy_rated::Topt1
 
     # Main economics parameters
-    "initial investment price ($/kWh)"
+    "initial investment price (\$/kWh)"
     investment_price::Float64
-    "operation and maintenance price ($/kWh/y)"
+    "operation and maintenance price (\$/kWh/y)"
     om_price::Float64
     "calendar lifetime (y)"
     lifetime_calendar::Float64
@@ -135,9 +135,9 @@ struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
     irradiance::Vector{Float64}
 
     # Main economics parameters
-    "initial investiment price ($/kW)"
+    "initial investiment price (\$/kW)"
     investment_price::Float64
-    "operation and maintenance price ($/kW)"
+    "operation and maintenance price (\$/kW/y)"
     om_price::Float64
     "lifetime (y)"
     lifetime::Float64
@@ -176,16 +176,16 @@ struct PVInverter{Topt<:Real} <: NonDispatchableSource
 
     # Main economics parameters
     # for AC part (inverter...)
-    "initial investiment price of inverter ($/kW_AC)"
+    "initial investiment price of inverter (\$/kW_AC)"
     investment_price_ac::Float64
-    "operation and maintenance price of inverter ($/kW_AC)"
+    "operation and maintenance price of inverter (\$/kW_AC/y)"
     om_price_ac::Float64
     "lifetime of inverter (y)"
     lifetime_ac::Float64
     # for DC part (PV panels...)
-    "initial investiment price of PV panels ($/kW_DC)"
+    "initial investiment price of PV panels (\$/kW_DC)"
     investment_price_dc::Float64
-    "operation and maintenance price of PV panels ($/kW_DC)"
+    "operation and maintenance price of PV panels (\$/kW_DC/y)"
     om_price_dc::Float64
     "lifetime of inverter (y)"
     lifetime_dc::Float64
@@ -213,9 +213,9 @@ struct WindPower{Topt<:Real} <: NonDispatchableSource
     capacity_factor::Vector{Float64}
 
     # Main economics parameters
-    "initial investiment price ($/kW)"
+    "initial investiment price (\$/kW)"
     investment_price::Float64
-    "operation and maintenance price ($/kW)"
+    "operation and maintenance price (\$/kW/y)"
     om_price::Float64
     "lifetime (y)"
     lifetime::Float64
@@ -314,13 +314,16 @@ struct OperVarsAggr
     renewables_rate
 end
 
-# Microgrid
+"""Microgrid system description"""
 struct Microgrid{Topt<:Real}
+    "microgrid project information"
     project::Project
-    power_load::Vector{Float64}
-    dieselgenerator::DieselGenerator{Topt}
-    # photovoltaic::Photovoltaic
-    # windpower::WindPower
-    battery::Battery{Topt}
+    "desired load time series (kW)"
+    load::Vector{Float64}
+    "dispatchable generator"
+    generator::DispatchableGenerator{Topt}
+    "energy storage (e.g. battery)"
+    storage::Battery{Topt,Topt}
+    "non-dispatchable sources (e.g. renewables like wind and solar)"
     nondispatchables #::Vector{NonDispatchableSource}
 end

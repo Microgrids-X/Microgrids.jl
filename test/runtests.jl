@@ -3,123 +3,107 @@
 using Microgrids
 using Test
 
-include("optimization_tests.jl")
+#include("optimization_tests.jl")
 
-@testset "Components: PV" begin
-    power_rated_PV = 5.0 # kW
-    fPV = 0.8 # derating in [0,1]
-    IT = [0., 0.5, 1.0]
-    IS = 1.0
-    investiment_cost_PV = 1000. # $/kW
-    om_cost_PV = 20.
-    replacement_cost_PV = 1000. # $/kW
-    salvage_cost_PV = 1000.
-    lifetime_PV = 25.0
-    pv = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
+@testset "Photovoltaic" begin
+    # Main parameters for Photovoltaic
+    power_rated_pv = 10.0 # (kW)
+    irradiance = [0., 0.5, 1.0] # (kW/m²)
+    investment_price_pv = 1000. # ($/kW)
+    om_price_pv = 20. # ($/kW/y)
+    lifetime_pv = 20. # (y)
+    # Parameters which should have default values
+    derating_factor_pv = 0.9 # ∈ [0,1]
+    replacement_price_ratio = 1.2
+    salvage_price_ratio = 0.8
 
-    @test pv.power_rated == power_rated_PV
-    @test production(pv) == IT * fPV * power_rated_PV;
-end
+    pv = Photovoltaic(power_rated_pv, irradiance,
+        investment_price_pv, om_price_pv,
+        lifetime_pv, derating_factor_pv,
+        replacement_price_ratio, salvage_price_ratio)
 
-@testset "Economics: PV" begin
-    lifetime_mg = 30.
-    proj0 = Project(lifetime_mg, 0.00, 1.) # no discount
-    proj5 = Project(lifetime_mg, 0.05, 1.) # 5% discount
+    @test pv.power_rated == power_rated_pv
+    @test pv.lifetime == lifetime_pv
+    @test production(pv) == [0.00, 0.45, 0.90] * power_rated_pv
 
-    power_rated_PV = 10. # kW
-    fPV = 1.
-    IT = [0., 0.5, 1.0]
-    IS = 1.0
-    investiment_cost_PV = 1000.
-    om_cost_PV = 20.
-    replacement_cost_PV = 1200.
-    salvage_cost_PV = 800.
-    lifetime_PV = 20.
+    @testset "Photovoltaic: Economics" begin
+        lifetime_mg = 30.
+        proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+        proj5 = Project(lifetime_mg, 0.05, 1., "€") # 5% discount
 
-    pv = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
-
-    @test annual_costs(pv, proj0) ==                   [24000.0,  10000.0, 6000.0, 12000.0, 4000.0]
-    @test round.(annual_costs(pv, proj5); digits=2) == [16671.65, 10000.0, 3074.49, 4522.67, 925.51]
-end
-
-@testset "Components: PV wth Inverter" begin
-    power_rated_PV = 5. #kW
-    ILR = 1.5
-    derating_factor = 0.9
-    irradiance = [0, 0.5, 1.0]
-    investiment_cost_inverter = 100.
-    om_cost_inverter = 10/6
-    replacement_cost_inverter = 100.
-    salvage_cost_inverter = 100.
-    lifetime_inverter = 15.
-    investiment_cost_panel = 1200. - investiment_cost_inverter
-    om_cost_panel = 20. - om_cost_inverter
-    replacement_cost_panel = 1200. - replacement_cost_inverter
-    salvage_cost_panel = 1200. - salvage_cost_inverter
-    lifetime_panel = 25.
-
-    pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
-                    om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
-                    om_cost_panel,replacement_cost_panel,salvage_cost_panel,lifetime_panel)
-
-    @test pvi.power_rated == power_rated_PV
-    prod=[0.0,0.0,0.0]
-    for i=1:length(irradiance)
-        prod[i] = min(ILR * power_rated_PV * derating_factor * irradiance[i],power_rated_PV)
+        expected_costs0 = [24000.00, 10000.0, 6000.00, 12000.00, 4000.00]
+        expected_costs5 = [16671.65, 10000.0, 3074.49,  4522.67,  925.51]
+        @test annual_costs(pv, proj0) == expected_costs0
+        @test round.(annual_costs(pv, proj5); digits=2) == expected_costs5
     end
-    @test production(pvi) == prod
 end
 
-@testset "Economics: PV wth Inverter" begin
-    lifetime_mg = 30
-    proj0 = Project(lifetime_mg, 0.00, 1.)
+@testset "PVInverter" begin
+    # Main parameters for Photovoltaic
+    power_rated_pv = 5.0 # (kW AC)
+    ILR = 2.0
+    irradiance = [0., 0.25, 0.5, 1.0] # (kW/m²)
+    # Inverter prices and lifetime:
+    investment_price_ac = 100. # ($/kW)
+    om_price_ac = 10.0/6 # ($/kW/y)
+    lifetime_ac = 15. # (y)
+    # Panel prices and lifetime:
+    investment_price_dc = 1200. - investment_price_ac# ($/kW)
+    om_price_dc = 20. - om_price_ac# ($/kW/y)
+    lifetime_dc = 25. # (y)
 
-    power_rated_PV = 5. #kW
-    ILR = 1.5
-    derating_factor = 0.9
-    irradiance = [0, 0.5, 1.0]
-    investiment_cost_inverter = 100.
-    om_cost_inverter = 10/6
-    replacement_cost_inverter = 100.
-    salvage_cost_inverter = 100.
-    lifetime_inverter = 15.
-    investiment_cost_panel = 1200. - investiment_cost_inverter
-    om_cost_panel = 20. - om_cost_inverter
-    replacement_cost_panel = 1200. - replacement_cost_inverter
-    salvage_cost_panel = 1200. - salvage_cost_inverter
-    lifetime_panel = 25.
+    # Parameters which should have default values
+    derating_factor_pv = 0.9 # ∈ [0,1]
+    replacement_price_ratio = 1.0
+    salvage_price_ratio = 1.0
 
-    pvi = PVInverter(power_rated_PV,ILR,derating_factor,irradiance,investiment_cost_inverter,
-                    om_cost_inverter,replacement_cost_inverter,salvage_cost_inverter,lifetime_inverter,investiment_cost_panel,
-                    om_cost_panel,replacement_cost_panel,salvage_cost_panel,lifetime_panel)
+    pvi = PVInverter(power_rated_pv, ILR, irradiance,
+        investment_price_ac, om_price_ac, lifetime_ac,
+        investment_price_dc, om_price_dc, lifetime_dc,
+        derating_factor_pv,
+        replacement_price_ratio, salvage_price_ratio)
 
-    @test annual_costs(pvi, proj0) == [15275.0,8750.0,4375.0,8750.0, 6600.0]
+    @test pvi.power_rated == power_rated_pv
+    @test production(pvi) == [0.00, 0.45, 0.90, 1.00] * power_rated_pv
+
+    @testset "PVInverter: Economics" begin
+        lifetime_mg = 30.
+        proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+        expected_costs = [19950.0, 11500.0, 5750.0, 11500.0, 8800.0]
+        @test round.(annual_costs(pvi, proj0); digits=3) == expected_costs
+    end
 end
 
 @testset "Economics: Battery" begin
     lifetime_mg = 25 # just a bit more than the battery
-    proj0 = Project(lifetime_mg, 0.00, 1.) # no discount
-    proj5 = Project(lifetime_mg, 0.05, 1.) # 5% discount
+    proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+    proj5 = Project(lifetime_mg, 0.05, 1., "€") # 5% discount
 
-    energy_initial = 0.
-    energy_max = 7.
-    energy_min = 0.
-    power_min = -1.0*energy_max
-    power_max = +1.0*energy_max
-    loss = 0.05
-    investiment_cost_BT = 100.
-    om_cost_BT = 10.
-    replacement_cost_BT = 90.
-    salvage_cost_BT = 80.
-    lifetime_BT = 20.
-    lifetime_thrpt = 3000.
+    # Main parameters for Battery
+    energy_rated = 7.0 # (kWh)
+    investment_price = 100.0 # ($/kWh)
+    om_price = 10.0 # ($/kWh/y)
+    lifetime_calendar = 20. # (y)
+    lifetime_cycles = 3000.
 
-    batt = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
+    # Secondary parameters (which should have a default value)
+    charge_rate = 2.0
+    discharge_rate = 3.0
+    loss_factor = 0.05
+    SoC_min = 0.0
+    SoC_ini = 0.5
+    replacement_price_ratio = 0.9
+    salvage_price_ratio = 0.8
+
+    batt = Battery(energy_rated,
+        investment_price, om_price, lifetime_calendar, lifetime_cycles,
+        charge_rate, discharge_rate, loss_factor, SoC_min, SoC_ini,
+        replacement_price_ratio, salvage_price_ratio)
 
     # Fake operation data: 1k cycles/year,
     aggr0C   = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,    0., 0., 0.)
-    aggr100C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 100.0*energy_max, 0., 0.) # not enough cycles to reduce the lifetime
-    aggr300C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 300.0*energy_max, 0., 0.) # lifetime reduced to 3000/300 = 10 yr
+    aggr100C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 100.0*energy_rated, 0., 0.) # not enough cycles to reduce the lifetime
+    aggr300C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 300.0*energy_rated, 0., 0.) # lifetime reduced to 3000/300 = 10 yr
 
     # no discount, with increasing amount of cycling
     @test annual_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
@@ -129,7 +113,7 @@ end
     @test round.(annual_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
 end
 
-@testset "Economics: MG" begin
+@testset "Economics: MG" begin # TO BE FIXED: July 2nd, 2023
     include("typical_parameters.jl")
 
     # Dummy time series (not used since operation simulation is bypassed)
@@ -137,14 +121,14 @@ end
     IT = [0, 0.5, 1.0]
 
     # Components:
-    dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investiment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
-    battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
-    photovoltaic = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
+    dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
+    battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
+    photovoltaic = Photovoltaic(power_rated_PV, fPV, IT, IS, investment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
 
 
     # Microgrid, with and without a 5% discount rate:
-    proj0 = Project(lifetime, 0, timestep)
-    proj5 = Project(lifetime, discount_rate, timestep)
+    proj0 = Project(lifetime, 0, timestep, "€")
+    proj5 = Project(lifetime, discount_rate, timestep, "€")
 
     mg0 = Microgrid(proj0, Pload, dieselgenerator, battery, [photovoltaic]);
     mg5 = Microgrid(proj5, Pload, dieselgenerator, battery, [photovoltaic]);
