@@ -1,6 +1,4 @@
-# abstract type Components end
-# abstract type NonDispatchables <: Components end
-abstract type NonDispatchables end
+
 
 """
 Microgrid project information
@@ -31,7 +29,7 @@ Dispatchable power source
 All component parameters should be `Float64` except for the
 *sizing parameter(s)* (here `power_rated`)
 which type is parametrized as `Topt` and may be also `Float64` or
-or any another `Real` type (e.g. ForwardDiff's dual number type)
+or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
 struct DispatchableGenerator{Topt<:Real}
     # Main technical parameters
@@ -50,19 +48,19 @@ struct DispatchableGenerator{Topt<:Real}
     "operation & maintenance price ($/kW/h of operation)"
     om_price_hours::Float64
     "generator lifetime (h of operation)"
-    lifetime::Float64
+    lifetime_hours::Float64
 
     # Secondary technical parameters (which should have a default value)
     "minimum load ratio ∈ [0,1]"
     load_ratio_min::Float64
 
     # Secondary economics parameters (which should have a default value)
-    "replacement price, as a fraction of initial investment price"
+    "replacement price, relative to initial investment"
     replacement_price_ratio::Float64
-    "salvage price, as a fraction of initial investment price"
+    "salvage price, relative to initial investment"
     salvage_price_ratio::Float64
-    "fuel quantity unit (used in fuel price and consumtion curve parameters)"
-    fuel_unit: str = "L"
+    "fuel quantity unit (used in fuel price and consumption curve parameters)"
+    fuel_unit::String
 end
 
 
@@ -70,141 +68,196 @@ end
 Battery energy storage (including AC/DC converter)
 
 Battery dynamics is E(k+1) = E(k) − (P(k) + α|P(k)|).Δt
-where α is a linear loss factor (`loss` field).
+where α is a linear loss factor (`loss_factor` field).
 It relates approximately to the roundtrip efficiency η as η = 1−2α.
+
+# About the types of the fields
+
+All component parameters should be `Float64` except for the
+*sizing parameter(s)* (here `energy_rated` and optionally `(dis)charge_rate`)
+which type is parametrized as `Topt1/2` and may be also `Float64` or
+or any another `Real` type (e.g. ForwardDiff's dual number type).
+"""
+struct Battery{Topt1<:Real,Topt2<:Real}
+    # Main technical parameters
+    "rated energy capacity (kWh)"
+    energy_rated::Topt1
+
+    # Main economics parameters
+    "initial investment price ($/kWh)"
+    investment_price::Float64
+    "operation and maintenance price ($/kWh/y)"
+    om_price::Float64
+    "calendar lifetime (y)"
+    lifetime_calendar::Float64
+    "maximum number of cycles over life"
+    lifetime_cycles::Float64
+
+    # Secondary technical parameters (which should have a default value)
+    "max charge power for 1 kWh (kW/kWh = h^-1)"
+    charge_rate::Topt2
+    "max discharge power for 1 kWh (kW/kWh = h^-1)"
+    discharge_rate::Topt2
+    "linear loss factor α (round-trip efficiency is about 1 − 2α) ∈ [0,1]"
+    loss_factor::Float64
+    "minimum State of Charge ∈ [0,1]"
+    SoC_min::Float64
+    "initial State of Charge ∈ [0,1]"
+    SoC_ini::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, relative to initial investment"
+    replacement_price_ratio::Float64
+    "salvage price, relative to initial investment"
+    salvage_price_ratio::Float64
+end
+
+"Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
+abstract type NonDispatchableSource end
+
+"""Solar photovoltaic generator (including AC/DC converter)
+
+See also `PVInverter` for a variant where the AC/DC converter
+can be sized as well.
 
 # About the types of the fields
 
 All component parameters should be `Float64` except for the
 *sizing parameter(s)* (here `power_rated`)
 which type is parametrized as `Topt` and may be also `Float64` or
-or any another `Real` type (e.g. ForwardDiff's dual number type)
+or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Battery{Topt<:Real}
-    "Initial energy (kWh)"
-    energy_initial::Float64
-    "Rated energy capacity (kWh)"
-    energy_max::Topt    # Eb_max
-    "Minimum energy level (kWh)"
-    energy_min::Float64    # Eb_min  TODO - it could be the minimum state of charge too
-    "Maximum charge power ∈ ``\\mathbf{R}^-`` (kW)"
-    power_min::Topt     # Pb_min - charge (negative)
-    "Maximum discharge power (kW)"
-    power_max::Topt     # Pb_max - discharge
-    "Linear loss factor ∈ [0,1]"
-    loss::Float64
-
-    # economics
-    "initial investiment price ($/kWh)"
-    investment_price::Float64
-    "operation and maintenance price ($/kWh)"
-    om_price::Float64
-    "replacement price ($/kWh)"
-    replacement_price_ratio::Float64
-    "salvage price ($/kWh)"
-    salvage_price_ratio::Float64
-    "lifetime (y)"
-    lifetime::Float64
-    "maximum number of cycles"
-    lifetime_throughput::Float64  # max throughput
-end
-
-"Photovoltaic parameters."
-struct Photovoltaic{Topt<:Real} <: NonDispatchables
-    "Rated power (kW)"
-    power_rated::Topt   # decision variable
-    "Derating factor ∈ [0,1]"
-    derating_factor::Float64
-    "Incident global solar radiation (kW/m²)"
-    IT::Vector{Float64}
-    "Standard amount of global solar radiation (kW/m²)"
-    IS::Float64
-
-    # economics
-    "initial investiment price ($/kW)"
-    investment_price::Float64
-    "operation and maintenance price ($/kW)"
-    om_price::Float64
-    "replacement price ($/kW)"
-    replacement_price_ratio::Float64
-    "salvage price ($/kW)"
-    salvage_price_ratio::Float64
-    "lifetime (y)"
-    lifetime::Float64
-
-    # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
-end
-
-"Photovoltaic parameters with inverter issues (AC DC)"
-struct PVInverter{Topt<:Real} <: NonDispatchables
-    "Rated power in AC (kW)"
+struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
+    # Main technical parameters
+    "rated power (kW)"
     power_rated::Topt
-    "Inverter loading ratio = PAC_rated/PDC_rated"
-    ILR::Topt
-    "Derating factor ∈ [0,1]"
-    derating_factor::Float64
-    "global solar irradiance incident on the PV array (kW/m²)"
+    "global solar irradiance incident on the PV array time series (kW/m²)"
     irradiance::Vector{Float64}
 
-    # economics
-    #AC (inverter)
-    "initial investiment price of inverter ($/kW)"
-    investment_price_ac::Float64
-    "operation and maintenance price of inverter ($/kW)"
-    om_price_ac::Float64
-    "replacement price of inverter ($/kW)"
-    replacement_price_ratio_ac::Float64
-    "salvage price of inverter ($/kW)"
-    salvage_price_ratio_ac::Float64
-    "lifetime of inverter (y)"
-    lifetime_ac::Float64
-    #DC (panels)
-    "initial investiment price of pannels ($/kW)"
-    investment_price_dc::Float64
-    "operation and maintenance price of pannels ($/kW)"
-    om_price_dc::Float64
-    "replacement price of pannels ($/kW)"
-    replacement_price_ratio_dc::Float64
-    "salvage price of pannels ($/kW)"
-    salvage_price_ratio_dc::Float64
-    "lifetime of pannels (y)"
-    lifetime_dc::Float64
-    # Photovoltaic(fPV, IT, IS, Y_PV) = new(fPV, IT, IS, Y_PV)
-
-end
-
-"Wind turbine parameters."
-struct WindPower{Topt<:Real} <: NonDispatchables
-    "Rated power (kW)"
-    power_rated::Topt
-    "Cut-in speed (m/s)"
-    U_cut_in::Float64
-    "Cut-out speed (m/s)"
-    U_cut_out::Float64
-    "Rated speed (m/s)"
-    U_rated::Float64
-    "Wind speed at the measurement height (m/s)"
-    Uanem::Vector{Float64}
-    "Hub height (m)"
-    zhub::Float64
-    "Measurement height (m)"
-    zanem::Float64
-    "Roughness length (m)"
-    z0::Float64
-    # TODO rho
-    # TODO rho0
-
-    # economics
+    # Main economics parameters
     "initial investiment price ($/kW)"
     investment_price::Float64
     "operation and maintenance price ($/kW)"
     om_price::Float64
-    "replacement price ($/kW)"
-    replacement_price_ratio::Float64
-    "salvage price ($/kW)"
-    salvage_price_ratio::Float64
     "lifetime (y)"
     lifetime::Float64
+
+    # Secondary technical parameters (which should have a default value)
+    "derating factor (or performance ratio) ∈ [0,1]"
+    derating_factor::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, relative to initial investment"
+    replacement_price_ratio::Float64
+    "salvage price, relative to initial investment"
+    salvage_price_ratio::Float64
+end
+
+"""Solar photovoltaic generator with ajdustable AC/DC converter
+
+See also `Photovoltaic` for a variant where the AC/DC converter
+has a fixed size relative to the PV panels.
+
+# About the types of the fields
+
+All component parameters should be `Float64` except for the
+*sizing parameter(s)* (here `power_rated`)
+which type is parametrized as `Topt` and may be also `Float64` or
+or any another `Real` type (e.g. ForwardDiff's dual number type).
+"""
+struct PVInverter{Topt<:Real} <: NonDispatchableSource
+    # Main technical parameters
+    "rated AC (inverter) power (kW)"
+    power_rated::Topt
+    "inverter loading ratio = ratio of DC (panels) to AC (inverter) rated powers"
+    ILR::Topt
+    "global solar irradiance incident on the PV array time series (kW/m²)"
+    irradiance::Vector{Float64}
+
+    # Main economics parameters
+    # for AC part (inverter...)
+    "initial investiment price of inverter ($/kW_AC)"
+    investment_price_ac::Float64
+    "operation and maintenance price of inverter ($/kW_AC)"
+    om_price_ac::Float64
+    "lifetime of inverter (y)"
+    lifetime_ac::Float64
+    # for DC part (PV panels...)
+    "initial investiment price of PV panels ($/kW_DC)"
+    investment_price_dc::Float64
+    "operation and maintenance price of PV panels ($/kW_DC)"
+    om_price_dc::Float64
+    "lifetime of inverter (y)"
+    lifetime_dc::Float64
+
+    # Secondary technical parameters (which should have a default value)
+    "derating factor (or performance ratio) ∈ [0,1]"
+    derating_factor::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, relative to initial investment"
+    replacement_price_ratio::Float64
+    "salvage price, relative to initial investment"
+    salvage_price_ratio::Float64
+end
+
+"""Wind power generator (simple model using a given capacity factor time series)
+
+See `capacity_from_wind` to compute capacity factor time series from wind speed.
+"""
+struct WindPower{Topt<:Real} <: NonDispatchableSource
+    # Main technical parameters
+    "rated power (kW)"
+    power_rated::Topt
+    "capacity factor (normalized power) time series ∈ [0,1]"
+    capacity_factor::Vector{Float64}
+
+    # Main economics parameters
+    "initial investiment price ($/kW)"
+    investment_price::Float64
+    "operation and maintenance price ($/kW)"
+    om_price::Float64
+    "lifetime (y)"
+    lifetime::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, relative to initial investment"
+    replacement_price_ratio::Float64
+    "salvage price, relative to initial investment"
+    salvage_price_ratio::Float64
+end
+
+function capacity_from_wind(v, TSP, Cp=0.50, v_out=25.0, α=3.0)
+    """Compute capacity factor (normalized power) of a wind turbine,
+    using a generic parametrized power curve P(v),
+    for a given a wind speed `v` (m/s).
+
+    Model parameters are:
+    Turbine Specific Power `TSP`, in W/m², typically 200 – 400.
+    Maximum power coefficient `Cp` (used before saturation)
+    should be smaller than Betz' limit of 16/27.
+    Cut-out wind speed is `v_out` (m/s).
+
+    A fixed Cp model is used, with a soft saturation when reaching maximum power.
+    This soft saturation, based on LogSumExp, is tuned with `α`
+    (default: 3.0, higher yields sharper transition).
+
+    Air is assumed to have fixed density ρ=1.225 kg/m³.
+    """
+    ρ = 1.225 # kg/m³ at 15°C
+    # Normalized power from the wind, without saturation:
+    cf = 0.5*Cp*ρ/TSP * v.^3
+    # saturation using a smooth min based on LogSumExp
+    cf = -log(exp(-α) + exp(-α*cf)) / α
+    # saturate negative values (due to the smooth min)
+    if cf < 0.0
+        cf = 0.0
+    end
+    # Cut-out wind speed:
+    if v > v_out
+        cf = 0.0
+    end
+    return cf
 end
 
 # Operation variables - Trajectory
@@ -269,5 +322,5 @@ struct Microgrid{Topt<:Real}
     # photovoltaic::Photovoltaic
     # windpower::WindPower
     battery::Battery{Topt}
-    nondispatchables #::Vector{NonDispatchables}
+    nondispatchables #::Vector{NonDispatchableSource}
 end
