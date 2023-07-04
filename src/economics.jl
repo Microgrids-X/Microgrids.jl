@@ -175,35 +175,34 @@ function annual_costs(dg::DispatchableGenerator, mg_project::Project, opervarsag
     total_DG_operation_hours = mg_project.lifetime * opervarsaggr.DG_operation_hours
 
     # number of replacements
-    replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime) - 1
+    replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime_hours) - 1
     # years that the replacements happen
-    replacement_years = [i*(dg.lifetime/opervarsaggr.DG_operation_hours) for i=1:replacements_number]     # TODO verify
+    replacement_years = [i*(dg.lifetime_hours/opervarsaggr.DG_operation_hours) for i=1:replacements_number]     # TODO verify
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
-
-    # component remaining life at the project end
-    remaining_life = dg.lifetime - (total_DG_operation_hours - dg.lifetime * replacements_number)
-    # proportional unitary salvage cost
-    proportional_salvage_cost = dg.salvage_cost * remaining_life / dg.lifetime
 
     # present investment cost
     investment_cost = dg.investment_price * dg.power_rated
     # present operation and maintenance cost
-    om_cost = sum(dg.om_cost * dg.power_rated * opervarsaggr.DG_operation_hours * discount_factors) # depends on the nb of the DG working Hours
+    om_cost = sum(dg.om_price_hours * dg.power_rated * opervarsaggr.DG_operation_hours * discount_factors) # depends on the nb of the DG working Hours
     # present replacement cost
     if replacements_number == 0
-        replacement_cost = 0
+        replacement_cost = 0.0
     else
-        replacement_cost = sum(dg.replacement_cost * dg.power_rated * replacement_factors)
-    end
-    # present salvage cost
-    if remaining_life == 0
-        salvage_cost = 0
-    else
-        salvage_cost = proportional_salvage_cost * dg.power_rated * discount_factors[mg_project.lifetime]
+        replacement_cost = sum(dg.replacement_price_ratio * investment_cost * replacement_factors)
     end
 
-    fuel_cost = sum(dg.fuel_cost * opervarsaggr.fuel_consumption * discount_factors)
+    # component remaining life at the project end
+    remaining_life = dg.lifetime_hours - (total_DG_operation_hours - dg.lifetime_hours * replacements_number)
+    # present salvage cost
+    if remaining_life == 0
+        salvage_cost = 0.0
+    else
+        nominal_salvage_cost = dg.salvage_price_ratio * investment_cost * remaining_life / dg.lifetime_hours
+        salvage_cost = nominal_salvage_cost * discount_factors[mg_project.lifetime]
+    end
+
+    fuel_cost = sum(dg.fuel_price * opervarsaggr.fuel_consumption * discount_factors)
 
     total_cost = investment_cost + replacement_cost + om_cost - salvage_cost + fuel_cost
 
@@ -275,10 +274,10 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
     end
 
     # DieselGenerator costs
-    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.dieselgenerator, mg.project, opervarsaggr)
+    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.generator, mg.project, opervarsaggr)
 
     # Battery costs
-    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.battery, mg.project, opervarsaggr)
+    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.storage, mg.project, opervarsaggr)
 
     # SUMMARY
     # total present investment cost

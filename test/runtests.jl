@@ -5,6 +5,47 @@ using Test
 
 #include("optimization_tests.jl")
 
+@testset "DispatchableGenerator" begin
+    # Main parameters for DispatchableGenerator
+    power_rated_gen = 10. # (kW)
+    fuel_intercept = 0.05 # (L/h/kW_max)
+    fuel_slope = 0.240  # (L/h/kW)
+    fuel_price = 1.5 # ($/L)
+    investment_price_gen = 400.
+    om_price_gen = 0.02
+    lifetime_gen = 15000.
+    # Parameters which should have default values
+    load_ratio_min = 0.33
+    replacement_price_ratio = 1.2
+    salvage_price_ratio = 0.8
+    fuel_unit = "€"
+
+    gen = DispatchableGenerator(power_rated_gen,
+        fuel_intercept, fuel_slope, fuel_price,
+        investment_price_gen, om_price_gen, lifetime_gen,
+        load_ratio_min,
+        replacement_price_ratio, salvage_price_ratio, fuel_unit)
+
+    @test gen.power_rated == power_rated_gen
+
+    @testset "DispatchableGenerator: Economics" begin
+        lifetime_mg = 30.
+        proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+
+        # Fake operation statistics:
+        oper_stats(gen_hours, gen_fuel) = OperVarsAggr(0., 0., 0., 0., 0.,
+            gen_hours, gen_fuel, 0., 0., 0.)
+
+        #expected_costs_0 = [4000.0, 4000.0, 0.0, 0.0, 0.0]
+        #@test round.(annual_costs(gen, proj0, oper_stats(0, 0)); digits=3) == expected_costs_0
+        expected_costs_fuel = [45812.4, 4000.0, 0.2*lifetime_mg, 0.0,
+                               3200*14970/15000, 1500*lifetime_mg]
+        @test round.(
+            annual_costs(gen, proj0, oper_stats(1, 1000));
+            digits=3 ) == expected_costs_fuel
+    end
+end
+
 @testset "Photovoltaic" begin
     # Main parameters for Photovoltaic
     power_rated_pv = 10.0 # (kW)
@@ -118,20 +159,30 @@ end
 
     # Dummy time series (not used since operation simulation is bypassed)
     Pload = [1., 1., 1.]
-    IT = [0, 0.5, 1.0]
+    irradiance = [0, 0.5, 1.0]
 
     # Components:
-    dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
-    battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
-    photovoltaic = Photovoltaic(power_rated_PV, fPV, IT, IS, investment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
+    generator = DispatchableGenerator(power_rated_gen,
+        fuel_intercept, fuel_slope, fuel_price,
+        investment_price_gen, om_price_gen, lifetime_gen,
+        load_ratio_min,
+        replacement_price_ratio, salvage_price_ratio, fuel_unit)
+    battery = Battery(energy_rated,
+        investment_price_sto, om_price_sto, lifetime_sto, lifetime_cycles,
+        charge_rate, discharge_rate, loss_factor_sto, SoC_min, SoC_ini,
+        replacement_price_ratio, salvage_price_ratio)
+    photovoltaic = Photovoltaic(power_rated_pv, irradiance,
+        investment_price_pv, om_price_pv,
+        lifetime_pv, derating_factor_pv,
+        replacement_price_ratio, salvage_price_ratio)
 
 
     # Microgrid, with and without a 5% discount rate:
-    proj0 = Project(lifetime, 0, timestep, "€")
+    proj0 = Project(lifetime, 0.0, timestep, "€")
     proj5 = Project(lifetime, discount_rate, timestep, "€")
 
-    mg0 = Microgrid(proj0, Pload, dieselgenerator, battery, [photovoltaic]);
-    mg5 = Microgrid(proj5, Pload, dieselgenerator, battery, [photovoltaic]);
+    mg0 = Microgrid(proj0, Pload, generator, battery, [photovoltaic]);
+    mg5 = Microgrid(proj5, Pload, generator, battery, [photovoltaic]);
 
     # Bypass of the operation simulation + aggregation:
     opervarsaggr = OperVarsAggr(6.774979e6, 0, 0, 0, 0.0, 3327, 670880.8054857135, 1.881753568922309e6, 4569.3, 58.74028997693115)
