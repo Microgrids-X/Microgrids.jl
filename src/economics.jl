@@ -166,25 +166,25 @@ function annual_costs(pvi::PVInverter, mg_project::Project)
             -(c_ac.salvage+c_dc.salvage)]
 end
 
-function annual_costs(dg::DispatchableGenerator, mg_project::Project, opervarsaggr::OperVarsAggr)
+function annual_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
 
     # discount factor for each year of the project
     discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
 
     # total diesel generator operation hours over the project lifetime
-    total_DG_operation_hours = mg_project.lifetime * opervarsaggr.DG_operation_hours
+    total_gen_hours = mg_project.lifetime * oper_stats.gen_hours
 
     # number of replacements
-    replacements_number = ceil(Integer, total_DG_operation_hours/dg.lifetime_hours) - 1
+    replacements_number = ceil(Integer, total_gen_hours/dg.lifetime_hours) - 1
     # years that the replacements happen
-    replacement_years = [i*(dg.lifetime_hours/opervarsaggr.DG_operation_hours) for i=1:replacements_number]     # TODO verify
+    replacement_years = [i*(dg.lifetime_hours/oper_stats.gen_hours) for i=1:replacements_number]     # TODO verify
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
 
     # present investment cost
     investment_cost = dg.investment_price * dg.power_rated
     # present operation and maintenance cost
-    om_cost = sum(dg.om_price_hours * dg.power_rated * opervarsaggr.DG_operation_hours * discount_factors) # depends on the nb of the DG working Hours
+    om_cost = sum(dg.om_price_hours * dg.power_rated * oper_stats.gen_hours * discount_factors) # depends on the nb of the DG working Hours
     # present replacement cost
     if replacements_number == 0
         replacement_cost = 0.0
@@ -193,7 +193,7 @@ function annual_costs(dg::DispatchableGenerator, mg_project::Project, opervarsag
     end
 
     # component remaining life at the project end
-    remaining_life = dg.lifetime_hours - (total_DG_operation_hours - dg.lifetime_hours * replacements_number)
+    remaining_life = dg.lifetime_hours - (total_gen_hours - dg.lifetime_hours * replacements_number)
     # present salvage cost
     if remaining_life == 0
         salvage_cost = 0.0
@@ -202,17 +202,17 @@ function annual_costs(dg::DispatchableGenerator, mg_project::Project, opervarsag
         salvage_cost = nominal_salvage_cost * discount_factors[mg_project.lifetime]
     end
 
-    fuel_cost = sum(dg.fuel_price * opervarsaggr.fuel_consumption * discount_factors)
+    fuel_cost = sum(dg.fuel_price * oper_stats.gen_fuel * discount_factors)
 
     total_cost = investment_cost + replacement_cost + om_cost - salvage_cost + fuel_cost
 
     return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost, fuel_cost]
 end
 
-function annual_costs(bt::Battery, mg_project::Project, opervarsaggr::OperVarsAggr)
-    if opervarsaggr.annual_throughput > 0.0
+function annual_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+    if oper_stats.storage_cycles > 0.0
         lifetime = min(
-            bt.energy_rated * bt.lifetime_cycles/opervarsaggr.annual_throughput, # cycling lifetime
+            bt.lifetime_cycles/oper_stats.storage_cycles, # cycling lifetime
             bt.lifetime_calendar # calendar lifetime
         )
     else
@@ -232,14 +232,14 @@ function annual_costs(bt::Battery, mg_project::Project, opervarsaggr::OperVarsAg
 end
 
 """
-    economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
+    economics(mg::Microgrid, oper_stats::OperationStats)
 
 Return the economics results for the microgrid `mg` and
-the aggregated operation variables `OperVarsAggr`.
+the aggregated operation statistics `oper_stats`.
 
 See also: [`aggregation`](@ref)
 """
-function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
+function economics(mg::Microgrid, oper_stats::OperationStats)
 
     # discount factor for each year of the project
     discount_factors = [ 1/((1 + mg.project.discount_rate)^i) for i=1:mg.project.lifetime ]
@@ -274,10 +274,10 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
     end
 
     # DieselGenerator costs
-    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.generator, mg.project, opervarsaggr)
+    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.generator, mg.project, oper_stats)
 
     # Battery costs
-    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.storage, mg.project, opervarsaggr)
+    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.storage, mg.project, oper_stats)
 
     # SUMMARY
     # total present investment cost
@@ -296,10 +296,10 @@ function economics(mg::Microgrid, opervarsaggr::OperVarsAggr)
     # total annualized cost
     annualized_cost = npc * recovery_factor
     # cost of energy
-    coe = annualized_cost / opervarsaggr.energy_served
+    coe = annualized_cost / oper_stats.served_energy
 
     # energy served over the project lifetime
-    energy_served_lifetime = opervarsaggr.energy_served * sum([1.0; discount_factors[1:length(discount_factors)-1]])
+    energy_served_lifetime = oper_stats.served_energy * sum([1.0; discount_factors[1:length(discount_factors)-1]])
     # levelized cost of energy
     lcoe = npc / energy_served_lifetime
 

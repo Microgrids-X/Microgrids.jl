@@ -260,60 +260,6 @@ function capacity_from_wind(v, TSP, Cp=0.50, v_out=25.0, α=3.0)
     return cf
 end
 
-# Operation variables - Trajectory
-struct OperVarsTraj{T<:Real}
-    # load
-    #= "Net load at each time instant after using the renewables power (kW)"
-    Pnl_req =#
-    "Net load at each time instant after dispatch (kW)"
-    power_net_load::Vector{T}
-    "Unmet load/Load shedding power at each time instant (kW)"
-    power_shedding::Vector{T}
-    # diesel generator
-    "Diesel generator power at each time instant (kW)"
-    Pgen::Vector{T}
-    # battery
-    "Battery energy at each time instant (kWh)"
-    Ebatt::Vector{T}
-    "Battery power at each time instant (kW)"
-    Pbatt::Vector{T}
-    "Maximum battery discharge power at time t (kW)"
-    Pbatt_dmax::Vector{T}
-    "Maximum battery charge power at time t (kW)"
-    Pbatt_cmax::Vector{T}
-    # renewables sources
-    "Renewables curtailment power at each time instant (kW)"
-    power_curtailment::Vector{T}
-end
-
-# Operation variables - Aggregation
-struct OperVarsAggr
-    # load
-    "Load energy served in one year (kWh)"
-    energy_served
-    "Maximum load shedding power (kW)"
-    power_shedding_max
-    "Maximum consecutive duration of load shedding (h)"
-    shedding_duration_max
-    "Load shedding energy in one year (kWh)"
-    energy_shedding_total
-    "Ratio between load shedding energy and total consumption in one year (%)"
-    shedding_rate
-    # diesel generator
-    "Number of diesel generator operation hours in one year (h)"
-    DG_operation_hours
-    "Diesel consumption in one year (L)"
-    fuel_consumption
-    # battery
-    "Number of completed battery cycles in one year"
-    annual_throughput
-    # renewables sources
-    "Maximum renewables curtailment power (kW)"
-    power_curtailment_max
-    "Ratio between energy supplied by renewables and energy served in one year (%)"
-    renewables_rate
-end
-
 """Microgrid system description"""
 struct Microgrid{Topt<:Real}
     "microgrid project information"

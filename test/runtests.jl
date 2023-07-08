@@ -33,15 +33,18 @@ using Test
         proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
 
         # Fake operation statistics:
-        oper_stats(gen_hours, gen_fuel) = OperVarsAggr(0., 0., 0., 0., 0.,
-            gen_hours, gen_fuel, 0., 0., 0.)
+        oper_stats(gen_hours, gen_fuel) = OperationStats(
+            0., 0., 0., 0., 0., 0.,
+            1e10, gen_hours, gen_fuel,
+            0., 0., 0., 0.,
+            0., 0., 0., 0., 0., 0.)
 
         #expected_costs_0 = [4000.0, 4000.0, 0.0, 0.0, 0.0]
         #@test round.(annual_costs(gen, proj0, oper_stats(0, 0)); digits=3) == expected_costs_0
         expected_costs_fuel = [45812.4, 4000.0, 0.2*lifetime_mg, 0.0,
                                3200*14970/15000, 1500*lifetime_mg]
         @test round.(
-            annual_costs(gen, proj0, oper_stats(1, 1000));
+            annual_costs(gen, proj0, oper_stats(1., 1000.));
             digits=3 ) == expected_costs_fuel
     end
 end
@@ -141,10 +144,15 @@ end
         charge_rate, discharge_rate, loss_factor, SoC_min, SoC_ini,
         replacement_price_ratio, salvage_price_ratio)
 
-    # Fake operation data: 1k cycles/year,
-    aggr0C   = OperVarsAggr(0., 0., 0., 0., 0., 0., 0.,    0., 0., 0.)
-    aggr100C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 100.0*energy_rated, 0., 0.) # not enough cycles to reduce the lifetime
-    aggr300C = OperVarsAggr(0., 0., 0., 0., 0., 0., 0., 300.0*energy_rated, 0., 0.) # lifetime reduced to 3000/300 = 10 yr
+    # Fake operation statistics for cycling:
+    oper_stats(storage_cycles) = OperationStats(
+        0., 0., 0., 0., 0., 0.,
+        0., 0., 0.,
+        storage_cycles, 0., 0., 0.,
+        0., 0., 0., 0., 0., 0.)
+    aggr0C   = oper_stats(0.0)
+    aggr100C = oper_stats(100.0) # not enough cycles to reduce the lifetime
+    aggr300C = oper_stats(300.0) # lifetime reduced to 3000/300 = 10 yr
 
     # no discount, with increasing amount of cycling
     @test annual_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
@@ -185,10 +193,26 @@ end
     mg5 = Microgrid(proj5, Pload, generator, battery, [photovoltaic]);
 
     # Bypass of the operation simulation + aggregation:
-    opervarsaggr = OperVarsAggr(6.774979e6, 0, 0, 0, 0.0, 3327, 670880.8054857135, 1.881753568922309e6, 4569.3, 58.74028997693115)
+    served_energy = 6.774979e6
+    gen_hours = 3327.0
+    gen_fuel = 670880.8
+    storage_cycles = 209.08
+    spilled_max = 4569.3
+    renew_rate = 58.74029
+    # Remark: 1e10 and 1e9 indicates fake values which should be nonzero
+    # but do not influence economic evaluation
+    oper_stats = OperationStats(
+        # load stats
+        served_energy, 0.0, 0.0, 0.0, 0.0, 0.0,
+        # gen stats
+        1e10, gen_hours, gen_fuel,
+        # storage stats
+        storage_cycles, 1e10, 1e10, 1e9,
+        # Non-dispatchable (typ. renewables) sources stats
+        1e10, spilled_max, 0.9, 1e11, 1e10, renew_rate)
 
-    costs0 = economics(mg0, opervarsaggr)
-    costs5 = economics(mg5, opervarsaggr)
+    costs0 = economics(mg0, oper_stats)
+    costs5 = economics(mg5, oper_stats)
 
     # NPC validations
     @test round(costs0.npc/1e6; digits=3) == 41.697 # M$, without discount

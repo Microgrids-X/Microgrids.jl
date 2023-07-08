@@ -3,7 +3,7 @@ module Microgrids
 export simulate,
        NonDispatchables,
        Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
-       OperVarsTraj, OperVarsAggr,
+       OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,
        ComponentCosts, MicrogridCosts, annual_costs, economics
 
