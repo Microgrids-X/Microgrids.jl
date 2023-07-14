@@ -1,5 +1,7 @@
 # Run of MicrogridsBenchmark.jl on Dell notebook (i7-1165G7)
 
+**Benchmark results outdated** -> to be run again on Dell i7
+
 ## System configuration
 
 Results obtained in Ubuntu 22.04, with external power adapter,

@@ -175,8 +175,9 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
 
     # Energy storage (e.g. battery) statistics
     pos(x) = x >= 0.0 ? x : 0.0 # positive part
-    storage_char_energy = sum(pos.(-oper_traj.Pbatt)) * dt # kWh/y
-    storage_dis_energy = sum(pos.(oper_traj.Pbatt)) * dt # kWh/y
+    neg(x) = x <= 0.0 ? -x : 0.0 # negative part
+    storage_char_energy = sum(neg, oper_traj.Pbatt) * dt # kWh/y
+    storage_dis_energy  = sum(pos, oper_traj.Pbatt) * dt # kWh/y
     storage_cycles = (storage_char_energy + storage_dis_energy) /
                      (2*mg.storage.energy_rated) # cycles/y
     Efin = oper_traj.Ebatt[end]
