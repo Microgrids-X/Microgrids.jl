@@ -24,7 +24,7 @@ investment_price_gen = 400.
 om_price_gen = 0.02
 lifetime_gen = 15000.
 load_ratio_min = 0.0
-fuel_unit = "€"
+fuel_unit = "L"
 
 # Battery energy storage
 energy_rated = 9000.
@@ -32,7 +32,6 @@ investment_price_sto = 350.
 om_price_sto = 10.
 lifetime_sto = 15.
 lifetime_cycles = 3000.
-
 charge_rate = 1.0
 discharge_rate = 1.0
 loss_factor_sto = 0.05
@@ -40,7 +39,7 @@ SoC_min = 0.
 SoC_ini = 0.
 
 # Photovoltaic generation
-power_rated_pv = 6000. # kW
+power_rated_pv = 6000.
 investment_price_pv = 1200.
 om_price_pv = 20.
 lifetime_pv = 25.
