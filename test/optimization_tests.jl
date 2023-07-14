@@ -40,7 +40,7 @@ using ForwardDiff
     x = [power_rated_gen, energy_rated, power_rated_pv]
 
     # Just a appetizer to check that cost computation works
-    npc_expected = 15.022 # M$ - was 15.022 before great rename
+    npc_expected = 15.023 # M$
     @test round(sim_npc(x)/1e6; digits=3) == npc_expected
 
     # Centered finite difference approximation of the gradient:
@@ -55,7 +55,7 @@ using ForwardDiff
     end
 
     # Test the finite difference approx of the gradient against recorded value
-    grad_expected = [281.879, 624.843, 1481.879] # was [282.358, 624.843, 1481.879] before great rename
+    grad_expected = [282.358, 624.843, 1481.879]
     @test round.(grad_approx; digits=3) == grad_expected # $/kW or $/kWh
 
     # Now gradient computation with ForwardDiff:

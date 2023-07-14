@@ -13,10 +13,10 @@ function dispatch(Pnl_req,
                   Pbatt_cmax,
                   Pbatt_dmax,
                   Pgen_max)
-    Pcurt = 0
-    Pshed = 0
+    Pcurt = 0.0
+    Pshed = 0.0
     # Pnl_req >= 0 - load excess - after evaluating the production (Pnl = Pload - VRE generation)
-    if Pnl_req >= 0
+    if Pnl_req >= 0.0
         # battery discharging --> Pbatt positive
         if Pnl_req >= Pbatt_dmax    # max(battery)
             Pbatt = Pbatt_dmax      # max(battery)
@@ -30,21 +30,21 @@ function dispatch(Pnl_req,
                 Pgen = Pnl_req - Pbatt
             end
         else
-            Pgen  = 0
+            Pgen  = 0.0
             Pbatt = Pnl_req
         end
     # Pnl_req < 0 - VRE excess
-    elseif Pnl_req < 0
-        Pgen  = 0
+    elseif Pnl_req < 0.0
+        Pgen  = 0.0
         # battery charging --> Pbatt negative
         if Pnl_req >= Pbatt_cmax    # min(battery)
             Pbatt = Pnl_req
         else
             Pbatt = Pbatt_cmax      # min(battery)
-            Pcurt  = Pbatt - Pnl_req 
+            Pcurt  = Pbatt - Pnl_req
         end
     end
     Pnl = Pnl_req - Pshed + Pcurt
-    return Pnl, Pgen, Pbatt, Pcurt, Pshed 
+    return Pnl, Pgen, Pbatt, Pcurt, Pshed
 end
 

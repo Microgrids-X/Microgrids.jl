@@ -104,10 +104,10 @@ function operation(mg::Microgrid)
     # Fixed parameters and short aliases
     K = length(mg.load)
     dt = mg.project.timestep
-    Psto_pmax =  mg.storage.discharge_rate * mg.storage.energy_rated
-    Psto_pmin = -mg.storage.charge_rate * mg.storage.energy_rated # <0 in line with the generator convention for Psto
     Esto_max = mg.storage.energy_rated
-    Esto_min = mg.storage.SoC_min * mg.storage.energy_rated
+    Esto_min = mg.storage.SoC_min * Esto_max
+    Psto_pmax =  mg.storage.discharge_rate * Esto_max
+    Psto_pmin = -mg.storage.charge_rate * Esto_max # <0 in line with the generator convention for Psto
     sto_loss = mg.storage.loss_factor
 
     # Initialization of loop variables
@@ -127,7 +127,7 @@ function operation(mg::Microgrid)
     for k=1:K
         # Storage energy and power limits
         Psto_emin = - (Esto_max - Esto[k]) / ((1 - sto_loss) * dt)
-        Psto_emax = (Esto[k] - Esto_min) / ((1 - sto_loss) * dt)
+        Psto_emax = (Esto[k] - Esto_min) / ((1 + sto_loss) * dt)
         Psto_dmax[k] = min(Psto_emax, Psto_pmax)
         Psto_cmax[k] = max(Psto_emin, Psto_pmin)
 
@@ -157,7 +157,7 @@ using the relaxation parameter `ε`:
 
 when using relaxation, a value between 0.05 and 0.30 is suggested
 """
-function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
+function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     ### Retrieve parameters
     dt = mg.project.timestep
     K = length(mg.load)
@@ -175,8 +175,8 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
 
     # Energy storage (e.g. battery) statistics
     pos(x) = x >= 0.0 ? x : 0.0 # positive part
-    storage_char_energy = sum(pos.(oper_traj.Pbatt)) * dt # kWh/y
-    storage_dis_energy = sum(pos.(-oper_traj.Pbatt)) * dt # kWh/y
+    storage_char_energy = sum(pos.(-oper_traj.Pbatt)) * dt # kWh/y
+    storage_dis_energy = sum(pos.(oper_traj.Pbatt)) * dt # kWh/y
     storage_cycles = (storage_char_energy + storage_dis_energy) /
                      (2*mg.storage.energy_rated) # cycles/y
     Efin = oper_traj.Ebatt[end]
