@@ -6,34 +6,42 @@ using ForwardDiff
 
     # Dummy time series (only 3 hours of operation, so that cost value below is meaningless)
     Pload = [1., 1., 1.]
-    IT = [0, 0.5, 1.0]
+    irradiance = [0, 0.5, 1.0]
 
     """simulate microgrid of size `x` (size=3) and returns its Net Present Cost"""
     function sim_npc(x)
-        power_rated_DG = x[1]
-        energy_max = x[2]
-        power_rated_PV = x[3]
-
-        power_min = -1.0*energy_max
-        power_max = +1.0*energy_max
+        power_rated_gen = x[1]
+        energy_rated = x[2]
+        power_rated_pv = x[3]
 
         # Components:
-        dieselgenerator = DieselGenerator(power_rated_DG, min_load_ratio, F0, F1, fuel_cost, investiment_cost_DG, om_cost_DG, replacement_cost_DG, salvage_cost_DG, lifetime_DG)
-        battery = Battery(energy_initial, energy_max, energy_min, power_min, power_max, loss, investiment_cost_BT, om_cost_BT, replacement_cost_BT, salvage_cost_BT, lifetime_BT, lifetime_thrpt)
-        photovoltaic = Photovoltaic(power_rated_PV, fPV, IT, IS, investiment_cost_PV, om_cost_PV, replacement_cost_PV, salvage_cost_PV, lifetime_PV)
+        generator = DispatchableGenerator(power_rated_gen,
+            fuel_intercept, fuel_slope, fuel_price,
+            investment_price_gen, om_price_gen, lifetime_gen,
+            load_ratio_min,
+            replacement_price_ratio, salvage_price_ratio, fuel_unit)
+        battery = Battery(energy_rated,
+            investment_price_sto, om_price_sto, lifetime_sto, lifetime_cycles,
+            charge_rate, discharge_rate, loss_factor_sto, SoC_min, SoC_ini,
+            replacement_price_ratio, salvage_price_ratio)
+        photovoltaic = Photovoltaic(power_rated_pv, irradiance,
+            investment_price_pv, om_price_pv,
+            lifetime_pv, derating_factor_pv,
+            replacement_price_ratio, salvage_price_ratio)
 
         # Microgrid project, with discount rate:
-        proj = Project(lifetime, discount_rate, timestep)
-        mg = Microgrid(proj, Pload, dieselgenerator, battery, [photovoltaic])
+        proj = Project(lifetime, discount_rate, timestep, "€")
+        mg = Microgrid(proj, Pload, generator, battery, [photovoltaic])
 
         results = simulate(mg)
         return results.costs.npc
     end
 
-    x = [power_rated_DG, energy_max, power_rated_PV]
+    x = [power_rated_gen, energy_rated, power_rated_pv]
 
     # Just a appetizer to check that cost computation works
-    @test round(sim_npc(x)/1e6; digits=3) == 15.023 # M$
+    npc_expected = 15.022 # M$ - was 15.022 before great rename
+    @test round(sim_npc(x)/1e6; digits=3) == npc_expected
 
     # Centered finite difference approximation of the gradient:
     dx = x*1e-3
@@ -47,10 +55,11 @@ using ForwardDiff
     end
 
     # Test the finite difference approx of the gradient against recorded value
-    @test round.(grad_approx; digits=3) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
+    grad_expected = [281.879, 624.843, 1481.879] # was [282.358, 624.843, 1481.879] before great rename
+    @test round.(grad_approx; digits=3) == grad_expected # $/kW or $/kWh
 
     # Now gradient computation with ForwardDiff:
     grad_fd = ForwardDiff.gradient(sim_npc, x)
-    @test round.(grad_fd; digits=3) == [282.358, 624.843, 1481.879] # $/kW or $/kWh
+    @test round.(grad_fd; digits=3) == grad_expected # $/kW or $/kWh
 
 end

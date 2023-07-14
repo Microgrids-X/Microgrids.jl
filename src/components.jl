@@ -74,14 +74,14 @@ It relates approximately to the roundtrip efficiency η as η = 1−2α.
 # About the types of the fields
 
 All component parameters should be `Float64` except for the
-*sizing parameter(s)* (here `energy_rated` and optionally `(dis)charge_rate`)
-which type is parametrized as `Topt1/2` and may be also `Float64` or
+*sizing parameter(s)* (here `energy_rated`)
+which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Battery{Topt1<:Real,Topt2<:Real}
+struct Battery{Topt<:Real}
     # Main technical parameters
     "rated energy capacity (kWh)"
-    energy_rated::Topt1
+    energy_rated::Topt
 
     # Main economics parameters
     "initial investment price (\$/kWh)"
@@ -95,9 +95,9 @@ struct Battery{Topt1<:Real,Topt2<:Real}
 
     # Secondary technical parameters (which should have a default value)
     "max charge power for 1 kWh (kW/kWh = h^-1)"
-    charge_rate::Topt2
+    charge_rate::Float64 # should be type Topt in a more advanced battery model
     "max discharge power for 1 kWh (kW/kWh = h^-1)"
-    discharge_rate::Topt2
+    discharge_rate::Float64 # should be type Topt in a more advanced battery model
     "linear loss factor α (round-trip efficiency is about 1 − 2α) ∈ [0,1]"
     loss_factor::Float64
     "minimum State of Charge ∈ [0,1]"
@@ -269,7 +269,7 @@ struct Microgrid{Topt<:Real}
     "dispatchable generator"
     generator::DispatchableGenerator{Topt}
     "energy storage (e.g. battery)"
-    storage::Battery{Topt,Topt}
+    storage::Battery{Topt}
     "non-dispatchable sources (e.g. renewables like wind and solar)"
     nondispatchables #::Vector{NonDispatchableSource}
 end

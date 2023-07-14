@@ -3,7 +3,7 @@
 using Microgrids
 using Test
 
-#include("optimization_tests.jl")
+include("optimization_tests.jl")
 
 @testset "DispatchableGenerator" begin
     # Main parameters for DispatchableGenerator
@@ -162,7 +162,7 @@ end
     @test round.(annual_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
 end
 
-@testset "Economics: MG" begin # TO BE FIXED: July 2nd, 2023
+@testset "Economics: MG" begin
     include("typical_parameters.jl")
 
     # Dummy time series (not used since operation simulation is bypassed)
@@ -183,7 +183,6 @@ end
         investment_price_pv, om_price_pv,
         lifetime_pv, derating_factor_pv,
         replacement_price_ratio, salvage_price_ratio)
-
 
     # Microgrid, with and without a 5% discount rate:
     proj0 = Project(lifetime, 0.0, timestep, "€")

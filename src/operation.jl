@@ -93,51 +93,54 @@ function operation(mg::Microgrid)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
     Topt = typeof(mg).parameters[1]
 
-    # photovoltaic production over one year
-    # photovoltaic_production = production(mg.photovoltaic)
-    renewables_production = collect(production(nd) for nd in mg.nondispatchables)
+    # Renewable power generation
+    # (remark on naming convention: all non-dispatchable sources are assumed renewable!)
+    renew_productions = collect(production(nd) for nd in mg.nondispatchables)
+    renew_potential = sum(renew_productions)::Vector{Topt}
 
-    # wind turbine production over one year
-    # windpower_production = production(mg.windpower)
+    # Desired net load
+    Pnl_request = mg.load - renew_potential
 
-    # power balance before battery+generator
-    # renewable_production = photovoltaic_production + windpower_production
+    # Fixed parameters and short aliases
+    K = length(mg.load)
+    dt = mg.project.timestep
+    Psto_pmax =  mg.storage.discharge_rate * mg.storage.energy_rated
+    Psto_pmin = -mg.storage.charge_rate * mg.storage.energy_rated # <0 in line with the generator convention for Psto
+    Esto_max = mg.storage.energy_rated
+    Esto_min = mg.storage.SoC_min * mg.storage.energy_rated
+    sto_loss = mg.storage.loss_factor
 
-    total_renewables_production = sum(renewables_production)::Vector{Topt}
-    power_net_load_requested = mg.power_load - total_renewables_production
+    # Initialization of loop variables
+    Pnl = zeros(Topt,K)
+    Pgen = zeros(Topt,K)
+    Esto = zeros(Topt,K+1)
+    Psto = zeros(Topt,K)
+    Psto_dmax = zeros(Topt,K)
+    Psto_cmax = zeros(Topt,K)
+    Pspill = zeros(Topt,K)
+    Pshed = zeros(Topt,K)
 
-    # variables initialization
-    stepsnumber = length(mg.power_load)
-    power_net_load = zeros(Topt,stepsnumber)
-    Pgen = zeros(Topt,stepsnumber)
-    Ebatt = zeros(Topt,stepsnumber+1)
-    Ebatt[1] = mg.battery.energy_initial
-    Pbatt = zeros(Topt,stepsnumber)
-    Pbatt_dmax = zeros(Topt,stepsnumber)
-    Pbatt_cmax = zeros(Topt,stepsnumber)
-    Pcurt = zeros(Topt,stepsnumber)
-    Pshed = zeros(Topt,stepsnumber)
+    # Initial storage state
+    Esto_ini = mg.storage.SoC_ini * mg.storage.energy_rated
+    Esto[1] = Esto_ini
 
-    for i=1:stepsnumber
-        # battery limits
-        Pb_emin = - (mg.battery.energy_max - Ebatt[i]) / ((1 - mg.battery.loss) * mg.project.timestep)
-        Pb_emax = (Ebatt[i] - mg.battery.energy_min) / ((1 + mg.battery.loss) * mg.project.timestep)
-        Pbatt_dmax[i] = min(Pb_emax,mg.battery.power_max)
-        Pbatt_cmax[i] = max(Pb_emin,mg.battery.power_min)
+    for k=1:K
+        # Storage energy and power limits
+        Psto_emin = - (Esto_max - Esto[k]) / ((1 - sto_loss) * dt)
+        Psto_emax = (Esto[k] - Esto_min) / ((1 - sto_loss) * dt)
+        Psto_dmax[k] = min(Psto_emax, Psto_pmax)
+        Psto_cmax[k] = max(Psto_emin, Psto_pmin)
 
         # dispatch
-        power_net_load[i], Pgen[i], Pbatt[i], Pcurt[i], Pshed[i] = dispatch(power_net_load_requested[i], Pbatt_cmax[i], Pbatt_dmax[i], mg.dieselgenerator.power_rated)
+        Pnl[k], Pgen[k], Psto[k], Pspill[k], Pshed[k] = dispatch(Pnl_request[k], Psto_cmax[k], Psto_dmax[k], mg.generator.power_rated)
 
-        # next battery energy level
-        if i < stepsnumber
-            Ebatt[i+1] = Ebatt[i] - (Pbatt[i] + mg.battery.loss * abs(Pbatt[i])) * mg.project.timestep
-            # if Ebatt[i+1] < 0
-            #     Ebatt[i+1] = 0
-            # end
+        # Storage dynamics
+        if k < K
+            Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
         end
     end
 
-    oper_traj = OperationTraj(power_net_load, Pshed, Prenew_pot, Pgen, Ebatt, Pbatt, Pbatt_dmax, Pbatt_cmax, Pcurt)
+    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen, Esto, Psto, Psto_dmax, Psto_cmax, Pspill)
     return oper_traj
 end
 
@@ -157,14 +160,14 @@ when using relaxation, a value between 0.05 and 0.30 is suggested
 function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
     ### Retrieve parameters
     dt = mg.project.timestep
-    nsteps = length(mg.load)
+    K = length(mg.load)
 
     ### Compute simple yearly statistics (sum, max...):
     # Load statistics
     load_energy = sum(mg.load) * dt # kWh/y
     shed_energy = sum(oper_traj.power_shedding) * dt # kWh/y
     served_energy = load_energy - shed_energy # kWh/y
-    shed_max = max(oper_traj.power_shedding) # kW
+    shed_max = maximum(oper_traj.power_shedding) # kW
     shed_rate = shed_energy / load_energy
 
     # Dispatchable generator statistics
@@ -183,7 +186,7 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
 
     # Non-dispatchable (typ. renewables) sources statistics
     spilled_energy = sum(oper_traj.power_curtailment) * dt # kWh/y
-    spilled_max = max(oper_traj.power_curtailment) # kW
+    spilled_max = maximum(oper_traj.power_curtailment) # kW
     renew_potential_energy = sum(oper_traj.Prenew_pot) * dt # kWh/y
     spilled_rate = spilled_energy / renew_potential_energy
     renew_energy = renew_potential_energy - spilled_energy
@@ -199,11 +202,11 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
 
     # auxilliary counter:
     shed_duration = 0.0; # duration of current load shedding event (h)
-    Pload_avg = load_energy/(nsteps*dt) # kW
+    Pload_avg = load_energy/(K*dt) # kW
 
-    for i = 1:nsteps
+    for k = 1:K
         # Dispatchable generator : operating hours and fuel consumption
-        Pgen = oper_traj.Pgen[i]
+        Pgen = oper_traj.Pgen[k]
         Pgen_max = mg.generator.power_rated
         if Pgen > 0.0 # generator ON
             Pgen_norm = Pgen / (ε * Pgen_max) # can be Inf e.g. for ε=0.0
@@ -221,7 +224,7 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
         end
 
         # Load shedding: shedding duration and maximum shedding duration
-        Pshed = oper_traj.power_shedding[i]
+        Pshed = oper_traj.power_shedding[k]
         if Pshed > 0.0
             Pshed_norm = Pshed / (ε * Pload_avg) # can be Inf e.g. for ε=0.0
             if Pshed_norm <= 1.0
