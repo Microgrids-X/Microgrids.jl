@@ -4,25 +4,41 @@
 
 ## System configuration
 
+Julia version 1.8.3
+
 Results obtained in Ubuntu 22.04, with external power adapter,
 using the “Performance” mode in Gnome Settings/Energy.
-This setting can have an enourmous influence:
-- “Balanced mode”: 180 µs → 260 µs or 180 µs, *it depends!*
-- “Power saver” mode: 180 µs → 425 µs
+This setting can have an major influence:
+- “Balanced” mode: often yields the best performance, but sometimes quite variable
+- “Power saver” mode: more than twice slower (144 µs → 344 µs)
 
 ## Results
 
-timing of simulate(mg):  181.090 μs (165 allocations: 759.12 KiB)
+timing of simulate(mg):  144 to 146 μs (173 allocations: 691.25 KiB)
 
 detailed timing of simulate(mg):
-- operation:  136.317 μs (24 allocations: 753.47 KiB)
-- aggregation:  38.359 μs (9 allocations: 144 bytes)
-- economics:  2.940 μs (132 allocations: 5.52 KiB)
+- operation:  117 μs (22 allocations: 684.98 KiB)
+- aggregation: 20.3 μs (19 allocations: 304 bytes)
+- economics:  2.93 μs (130 allocations: 5.77 KiB)
 
-timing of gradient(sim_npc, x):  353.284 μs (181 allocations: 2.75 MiB)
-
+timing of gradient(sim_npc, x):  388 μs (187 allocations: 2.69 MiB),
+which represents 2.7× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2022-07-14: Refactor operation and aggregation
+
+Good news: about 40 µs saved on simulate(mg): 181 → 144 µs
+- about 20 µs saved on operation: 136 → 117 µs
+  (perhaps thanks to the 68 KiB allocation saved, i.e. one hourly time series?)
+- about 20 µs saved on aggregation: 38 → 20 µs
+
+Perhaps even faster simulation could be achievied by merging aggregation
+into operation (i.e. make time series recording optional), like in Microgrids.py.
+
+Not so good: gradient evaluation timing increased from 353 → 388 µs,
+albeit with quite some variability (despite ~60 KiB allocation saved),
+so the timing ration gradient/simulation increases to 2.7.
 
 ### 2022-10-25: Add gradient timing
 
