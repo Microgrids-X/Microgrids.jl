@@ -1,20 +1,39 @@
 # Economic modeling of a microgrid project
 
-# TODO 2022: use the ComponentCosts struct as an output of annual_costs functions, rather than Vectors
-"Cost factors of a Microgrid component, expressed as Net Present Values over the Microgrid project lifetime"
-struct ComponentCosts
-    "Total cost (initial + replacement + O&M + fuel + salvage)"
+"""Net present cost factors of some part of a Microgrid project
+
+Cost factors can be evaluated to a *single component*
+or to a *set* of components like the entire microgrid system.
+
+Cost factors are expressed as Net Present Values, meaning they represent
+*cumulated and discounted* sums over the lifetime the Microgrid project.
+"""
+struct CostFactors
+    "total cost (initial + replacement + O&M + fuel + salvage)"
     total
-    "Initial investment cost"
+    "initial investment cost"
     investment
-    "Replacement cost"
+    "replacement(s) cost"
     replacement
-    "Operation & Maintenance (O&M) cost"
+    "operation & maintenance (O&M) cost"
     om
-    "Fuel cost"
+    "fuel cost"
     fuel
-    "Salvage cost (negative)"
+    "salvage cost (negative)"
     salvage
+end
+
+"Add two cost factor structures, factor by factor."
+function Base.:+(c1::CostFactors, c2::CostFactors)
+    c = CostFactors(
+        c1.total + c2.total,
+        c1.investment + c2.investment,
+        c1.replacement + c2.replacement,
+        c1.om + c2.om,
+        c1.fuel + c2.fuel,
+        c1.salvage + c2.salvage
+    )
+    return c
 end
 
 # TODO 2022: split the giant MicrogridCosts struct into a hierarchical struct of structs
@@ -84,81 +103,126 @@ struct MicrogridCosts
     WT_salvage_cost
 end
 
+"""
+    component_costs(mg_project::Project, lifetime::Real,
+        investment::Real, replacement::Real, salvage::Real,
+        om_annual::Real, fuel_annual::Real)
 
-function annual_costs(mg_project::Project, quantity, investment_price, replacement_price, salvage_price, om_price, fuel_consumption, fuel_price, lifetime)
+Compute net present cost factors of a component over the Microgrid lifetime.
+
+Cost evaluation is done from nominal and annual cost factors.
+
+### Arguments
+
+- mg_project: microgrid project description (e.g. with discount rate and lifetime)
+- lifetime: effective lifetime of the component
+- investment: initial investment cost
+- replacement: nominal cost for each replacement
+- salvage: nominal salvage value if component is sold at zero aging
+- om_annual: nominal operation & maintenance (O&M) cost per year
+- fuel_annual: nominal total cost of fuel per year
+"""
+function component_costs(mg_project::Project, lifetime::Real,
+    investment::Real, replacement::Real, salvage::Real,
+    om_annual::Real, fuel_annual::Real)
+
+    # Microgrid project parameters:
+    mg_lifetime = mg_project.lifetime
     # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
+    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_lifetime ]
     sum_discounts = sum(discount_factors)
 
+    ### Operation & maintenance and fuel costs
+    om_cost = om_annual * sum_discounts
+    fuel_cost = fuel_annual * sum_discounts
+
+    ### Replacement and salvage:
+
     # number of replacements
-    replacements_number = ceil(Integer, mg_project.lifetime/lifetime) - 1
+    replacements_number = ceil(Integer, mg_lifetime/lifetime) - 1
     # years that the replacements happen
     replacement_years = [i*lifetime for i=1:replacements_number]
     # discount factors for the replacements years
     replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
 
-    # component remaining life at the project end
-    remaining_life = lifetime*(1+replacements_number) - mg_project.lifetime
-    # proportional unitary salvage cost given remaining life
-    salvage_price_effective = salvage_price * remaining_life / lifetime
-
-    # present investment cost
-    investment_cost = investment_price * quantity
-    # present operation and maintenance cost
-    om_cost = om_price * quantity * sum_discounts
-    # present replacement cost
+    # net present replacement cost
     if replacements_number == 0
         replacement_cost = 0.0
     else
-        replacement_cost = replacement_price * quantity * sum(replacement_factors)
-    end
-    # Salvage cost (<0)
-    salvage_cost = -salvage_price_effective * quantity * discount_factors[mg_project.lifetime]
-
-    if fuel_consumption > 0.0
-        fuel_cost = fuel_price * fuel_consumption * sum_discounts
-    else
-        fuel_cost = 0.0
+        replacement_cost = replacement * sum(replacement_factors)
     end
 
-    total_cost = investment_cost + replacement_cost + om_cost + fuel_cost + salvage_cost
+    # component remaining life at the project end
+    remaining_life = lifetime*(1+replacements_number) - mg_lifetime
+    # nominal *effective* salvage value (that is given remaining life)
+    salvage_effective = salvage * remaining_life / lifetime
 
-    return ComponentCosts(total_cost, investment_cost, replacement_cost, om_cost, fuel_cost, salvage_cost)
+    # net present salvage cost (<0)
+    salvage_cost = -salvage_effective * discount_factors[mg_lifetime]
+
+    ### Total
+    total_cost = investment + replacement_cost + om_cost + fuel_cost + salvage_cost
+
+    return CostFactors(total_cost, investment, replacement_cost, om_cost, fuel_cost, salvage_cost)
 end
 
-"""costs for NonDispatchableSource (PV, wind...) components"""
-function annual_costs(nd::NonDispatchableSource, mg_project::Project)
-    c = annual_costs(
-        mg_project,
-        nd.power_rated,
-        nd.investment_price,
-        nd.investment_price * nd.replacement_price_ratio,
-        nd.investment_price * nd.salvage_price_ratio,
-        nd.om_price,
-        0.0, 0.0,
-        nd.lifetime)
+
+
+"""
+    component_costs(nd::NonDispatchableSource, mg_project::Project)
+
+Compute net present cost factors for a `NonDispatchableSource`.
+
+This includes generic Photovoltaic or Wind power sources.
+"""
+function component_costs(nd::NonDispatchableSource, mg_project::Project)
+    rating = nd.power_rated
+    investment = nd.investment_price * rating
+    replacement = investment * nd.replacement_price_ratio
+    salvage = investment * nd.salvage_price_ratio
+    om_annual = nd.om_price * rating
+    fuel_annual = 0.0
+
+    c = component_costs(
+        mg_project, nd.lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 
-function annual_costs(pvi::PVInverter, mg_project::Project)
-    c_ac = annual_costs(
-        mg_project,
-        pvi.power_rated,
-        pvi.investment_price_ac,
-        pvi.investment_price_ac * pvi.replacement_price_ratio,
-        pvi.investment_price_ac * pvi.salvage_price_ratio,
-        pvi.om_price_ac,
-        0.0, 0.0,
-        pvi.lifetime_ac)
-    c_dc = annual_costs(
-        mg_project,
-        pvi.power_rated*pvi.ILR, # DC rated power
-        pvi.investment_price_dc,
-        pvi.investment_price_dc * pvi.replacement_price_ratio,
-        pvi.investment_price_dc * pvi.salvage_price_ratio,
-        pvi.om_price_dc,
-        0.0, 0.0,
-        pvi.lifetime_dc)
+"""
+    component_costs(pv::PVInverter, mg_project::Project)
+
+Compute net present cost factors for a `PVInverter` component.
+"""
+function component_costs(pv::PVInverter, mg_project::Project)
+    # Costs of AC part (~inverter)
+    rating = pv.power_rated
+    investment = pv.investment_price_ac * rating
+    replacement = investment * pv.replacement_price_ratio
+    salvage = investment * pv.salvage_price_ratio
+    om_annual = pv.om_price_ac * rating
+    fuel_annual = 0.0
+
+    c_ac = component_costs(
+        mg_project, pv.lifetime_ac,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
+
+    # Costs of DC part (~panels)
+    rating = pv.power_rated * pv.ILR # DC rated power
+    investment = pv.investment_price_dc * rating
+    replacement = investment * pv.replacement_price_ratio
+    salvage = investment * pv.salvage_price_ratio
+    om_annual = pv.om_price_dc * rating
+
+    c_dc = component_costs(
+        mg_project, pv.lifetime_dc,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
     return [c_ac.total + c_dc.total,
             c_ac.investment + c_dc.investment,
             c_ac.om + c_dc.om,
@@ -166,7 +230,12 @@ function annual_costs(pvi::PVInverter, mg_project::Project)
             -(c_ac.salvage+c_dc.salvage)]
 end
 
-function annual_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+"""
+    component_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+
+Compute net present cost factors for a `DispatchableGenerator`.
+"""
+function component_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
 
     # discount factor for each year of the project
     discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
@@ -209,7 +278,19 @@ function annual_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats
     return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost, fuel_cost]
 end
 
-function annual_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+"""
+    component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+
+Compute net present cost factors for a `Battery`.
+"""
+function component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+    rating = bt.energy_rated
+    investment = bt.investment_price * rating
+    replacement = investment * bt.replacement_price_ratio
+    salvage = investment * bt.salvage_price_ratio
+    om_annual = bt.om_price * rating
+    fuel_annual = 0.0
+
     if oper_stats.storage_cycles > 0.0
         lifetime = min(
             bt.lifetime_cycles/oper_stats.storage_cycles, # cycling lifetime
@@ -218,16 +299,12 @@ function annual_costs(bt::Battery, mg_project::Project, oper_stats::OperationSta
     else
         lifetime = bt.lifetime_calendar
     end
+    c = component_costs(
+        mg_project, lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
 
-    c = annual_costs(
-        mg_project,
-        bt.energy_rated,
-        bt.investment_price,
-        bt.investment_price * bt.replacement_price_ratio,
-        bt.investment_price * bt.salvage_price_ratio,
-        bt.om_price,
-        0.0, 0.0,
-        lifetime)
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 
@@ -267,17 +344,17 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
     # NonDispatchables costs
     for i=1:length(mg.nondispatchables)
         if (typeof(mg.nondispatchables[i]) <: Photovoltaic) || (typeof(mg.nondispatchables[i]) <: PVInverter)
-            PV_total_cost, PV_investment_cost, PV_om_cost, PV_replacement_cost, PV_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)
+            PV_total_cost, PV_investment_cost, PV_om_cost, PV_replacement_cost, PV_salvage_cost = component_costs(mg.nondispatchables[i], mg.project)
         elseif typeof(mg.nondispatchables[i]) == WindPower
-            WT_total_cost, WT_investment_cost, WT_om_cost, WT_replacement_cost, WT_salvage_cost = annual_costs(mg.nondispatchables[i], mg.project)
+            WT_total_cost, WT_investment_cost, WT_om_cost, WT_replacement_cost, WT_salvage_cost = component_costs(mg.nondispatchables[i], mg.project)
         end
     end
 
     # DieselGenerator costs
-    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = annual_costs(mg.generator, mg.project, oper_stats)
+    DG_total_cost, DG_investment_cost, DG_om_cost, DG_replacement_cost, DG_salvage_cost, DG_fuel_cost = component_costs(mg.generator, mg.project, oper_stats)
 
     # Battery costs
-    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = annual_costs(mg.storage, mg.project, oper_stats)
+    BT_total_cost, BT_investment_cost, BT_om_cost, BT_replacement_cost, BT_salvage_cost = component_costs(mg.storage, mg.project, oper_stats)
 
     # SUMMARY
     # total present investment cost

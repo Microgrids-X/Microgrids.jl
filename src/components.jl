@@ -153,7 +153,7 @@ struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
     salvage_price_ratio::Float64
 end
 
-"""Solar photovoltaic generator with ajdustable AC/DC converter
+"""Solar photovoltaic generator with adjustable AC/DC converter
 
 See also `Photovoltaic` for a variant where the AC/DC converter
 has a fixed size relative to the PV panels.

@@ -3,6 +3,8 @@
 using Microgrids
 using Test
 
+
+include("economics_tests.jl")
 include("optimization_tests.jl")
 
 @testset "DispatchableGenerator" begin
@@ -44,7 +46,7 @@ include("optimization_tests.jl")
         expected_costs_fuel = [45812.4, 4000.0, 0.2*lifetime_mg, 0.0,
                                3200*14970/15000, 1500*lifetime_mg]
         @test round.(
-            annual_costs(gen, proj0, oper_stats(1., 1000.));
+            component_costs(gen, proj0, oper_stats(1., 1000.));
             digits=3 ) == expected_costs_fuel
     end
 end
@@ -77,8 +79,8 @@ end
 
         expected_costs0 = [24000.00, 10000.0, 6000.00, 12000.00, 4000.00]
         expected_costs5 = [16671.65, 10000.0, 3074.49,  4522.67,  925.51]
-        @test annual_costs(pv, proj0) == expected_costs0
-        @test round.(annual_costs(pv, proj5); digits=2) == expected_costs5
+        @test component_costs(pv, proj0) == expected_costs0
+        @test round.(component_costs(pv, proj5); digits=2) == expected_costs5
     end
 end
 
@@ -114,7 +116,7 @@ end
         lifetime_mg = 30.
         proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
         expected_costs = [19950.0, 11500.0, 5750.0, 11500.0, 8800.0]
-        @test round.(annual_costs(pvi, proj0); digits=3) == expected_costs
+        @test round.(component_costs(pvi, proj0); digits=3) == expected_costs
     end
 end
 
@@ -155,11 +157,11 @@ end
     aggr300C = oper_stats(300.0) # lifetime reduced to 3000/300 = 10 yr
 
     # no discount, with increasing amount of cycling
-    @test annual_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
-    @test annual_costs(batt, proj0, aggr100C) == [2660.0, 700.0, 1750.0,  630.0, 420.0]
-    @test annual_costs(batt, proj0, aggr300C) == [3430.0, 700.0, 1750.0, 1260.0, 280.0]
+    @test component_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
+    @test component_costs(batt, proj0, aggr100C) == [2660.0, 700.0, 1750.0,  630.0, 420.0]
+    @test component_costs(batt, proj0, aggr300C) == [3430.0, 700.0, 1750.0, 1260.0, 280.0]
     # with discount
-    @test round.(annual_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
+    @test round.(component_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
 end
 
 @testset "Economics: MG" begin
