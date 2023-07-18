@@ -4,7 +4,7 @@
 
 ## System configuration
 
-Julia version 1.8.3
+Julia version 1.9.2
 
 Results obtained in Ubuntu 22.04, with external power adapter,
 using the “Performance” mode in Gnome Settings/Energy.
@@ -14,19 +14,30 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  144 to 146 μs (173 allocations: 691.25 KiB)
+timing of simulate(mg):  153 to 156 μs (185 allocations: 691.45 KiB)
 
 detailed timing of simulate(mg):
-- operation:  117 μs (22 allocations: 684.98 KiB)
-- aggregation: 20.3 μs (19 allocations: 304 bytes)
-- economics:  2.93 μs (130 allocations: 5.77 KiB)
+- operation:  126    μs (22 allocations: 684.98 KiB)
+- aggregation: 20.6  μs (19 allocations: 304 bytes)
+- economics:    3.28 μs (144 allocations: 6.17 KiB)
 
-timing of gradient(sim_npc, x):  388 μs (187 allocations: 2.69 MiB),
-which represents 2.7× simulation time (gradient of dim 3).
+timing of gradient(sim_npc, x):  550 μs (207 allocations: 2.69 MiB)
+which represents 3.6× simulation time (gradient of dim 3).
 
 ## Changes
 
-### 2022-07-14: Refactor operation and aggregation
+### 2023-07-18: Updgrade Julia 1.8 → 1.9
+
+Small performance *decrease* with the Julia upgrade 1.8 → 1.9
+on `simulate(mg)`: 144 → 153 µs (+6%),
+with most increase coming from `operation`.
+Still, in relative terms, `economics` also slowed down: 2.9 → 3.3 µs
+
+Stronger negative impact on gradient computation: 390 µs → 550 µs (+41%),
+which represents now 3.6× the simulation time, almost as slow as finite difference.
+(remark: ForwardDiff was also updated in the process)
+
+### 2023-07-14: Refactor operation and aggregation
 
 Good news: about 40 µs saved on simulate(mg): 181 → 144 µs
 - about 20 µs saved on operation: 136 → 117 µs
