@@ -41,13 +41,20 @@ include("optimization_tests.jl")
             0., 0., 0., 0.,
             0., 0., 0., 0., 0., 0.)
 
-        #expected_costs_0 = [4000.0, 4000.0, 0.0, 0.0, 0.0]
-        #@test round.(annual_costs(gen, proj0, oper_stats(0, 0)); digits=3) == expected_costs_0
+        # Case of zero usage of generator
+        expected_costs_0 = [800.0, 4000.0, 0.0, 0.0,
+                            3200.0, 0.0]
+        component_costs(gen, proj0, oper_stats(0., 0.))
+        @test round.(
+            component_costs(gen, proj0, oper_stats(0., 0.));
+            digits=3) == expected_costs_0
+        # Case of non zero usage of generator
         expected_costs_fuel = [45812.4, 4000.0, 0.2*lifetime_mg, 0.0,
                                3200*14970/15000, 1500*lifetime_mg]
         @test round.(
             component_costs(gen, proj0, oper_stats(1., 1000.));
             digits=3 ) == expected_costs_fuel
+        # TODO: add zero usage of generator of size 0...
     end
 end
 

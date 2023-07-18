@@ -120,7 +120,7 @@ Cost evaluation is done from nominal and annual cost factors.
 - replacement: nominal cost for each replacement
 - salvage: nominal salvage value if component is sold at zero aging
 - om_annual: nominal operation & maintenance (O&M) cost per year
-- fuel_annual: nominal total cost of fuel per year
+- fuel_annual: nominal cost of fuel per year
 """
 function component_costs(mg_project::Project, lifetime::Real,
     investment::Real, replacement::Real, salvage::Real,
@@ -137,25 +137,30 @@ function component_costs(mg_project::Project, lifetime::Real,
     fuel_cost = fuel_annual * sum_discounts
 
     ### Replacement and salvage:
+    if lifetime < Inf
+        # number of replacements
+        replacements_number = ceil(Integer, mg_lifetime/lifetime) - 1
 
-    # number of replacements
-    replacements_number = ceil(Integer, mg_lifetime/lifetime) - 1
-    # years that the replacements happen
-    replacement_years = [i*lifetime for i=1:replacements_number]
-    # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
+        # net present replacement cost
+        if replacements_number == 0
+            replacement_cost = 0.0
+        else
+            # years that the replacements happen
+            replacement_years = [i*lifetime for i=1:replacements_number]
+            # discount factors for the replacements years
+            replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
+            replacement_cost = replacement * sum(replacement_factors)
+        end
 
-    # net present replacement cost
-    if replacements_number == 0
+        # component remaining life at the project end
+        remaining_life = lifetime*(1+replacements_number) - mg_lifetime
+        # nominal *effective* salvage value (that is given remaining life)
+        salvage_effective = salvage * remaining_life / lifetime
+
+    else # Infinite lifetime (happens for components with zero usage)
         replacement_cost = 0.0
-    else
-        replacement_cost = replacement * sum(replacement_factors)
+        salvage_effective = salvage # component sold "as new"
     end
-
-    # component remaining life at the project end
-    remaining_life = lifetime*(1+replacements_number) - mg_lifetime
-    # nominal *effective* salvage value (that is given remaining life)
-    salvage_effective = salvage * remaining_life / lifetime
 
     # net present salvage cost (<0)
     salvage_cost = -salvage_effective * discount_factors[mg_lifetime]
@@ -231,51 +236,27 @@ function component_costs(pv::PVInverter, mg_project::Project)
 end
 
 """
-    component_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
 
 Compute net present cost factors for a `DispatchableGenerator`.
 """
-function component_costs(dg::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+    rating = gen.power_rated
+    investment = gen.investment_price * rating
+    replacement = investment * gen.replacement_price_ratio
+    salvage = investment * gen.salvage_price_ratio
+    om_annual = gen.om_price_hours * oper_stats.gen_hours * rating
+    fuel_annual = gen.fuel_price * oper_stats.gen_fuel
 
-    # discount factor for each year of the project
-    discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_project.lifetime ]
+    # effective generator lifetime in years
+    lifetime = gen.lifetime_hours / oper_stats.gen_hours
 
-    # total diesel generator operation hours over the project lifetime
-    total_gen_hours = mg_project.lifetime * oper_stats.gen_hours
-
-    # number of replacements
-    replacements_number = ceil(Integer, total_gen_hours/dg.lifetime_hours) - 1
-    # years that the replacements happen
-    replacement_years = [i*(dg.lifetime_hours/oper_stats.gen_hours) for i=1:replacements_number]     # TODO verify
-    # discount factors for the replacements years
-    replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
-
-    # present investment cost
-    investment_cost = dg.investment_price * dg.power_rated
-    # present operation and maintenance cost
-    om_cost = sum(dg.om_price_hours * dg.power_rated * oper_stats.gen_hours * discount_factors) # depends on the nb of the DG working Hours
-    # present replacement cost
-    if replacements_number == 0
-        replacement_cost = 0.0
-    else
-        replacement_cost = sum(dg.replacement_price_ratio * investment_cost * replacement_factors)
-    end
-
-    # component remaining life at the project end
-    remaining_life = dg.lifetime_hours - (total_gen_hours - dg.lifetime_hours * replacements_number)
-    # present salvage cost
-    if remaining_life == 0
-        salvage_cost = 0.0
-    else
-        nominal_salvage_cost = dg.salvage_price_ratio * investment_cost * remaining_life / dg.lifetime_hours
-        salvage_cost = nominal_salvage_cost * discount_factors[mg_project.lifetime]
-    end
-
-    fuel_cost = sum(dg.fuel_price * oper_stats.gen_fuel * discount_factors)
-
-    total_cost = investment_cost + replacement_cost + om_cost - salvage_cost + fuel_cost
-
-    return [total_cost, investment_cost, om_cost, replacement_cost, salvage_cost, fuel_cost]
+    c = component_costs(
+        mg_project, lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
+    return [c.total, c.investment, c.om, c.replacement, -c.salvage, c.fuel]
 end
 
 """
