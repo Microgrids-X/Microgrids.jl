@@ -103,6 +103,8 @@ struct MicrogridCosts
     WT_salvage_cost
 end
 
+### component_costs methods
+
 """
     component_costs(mg_project::Project, lifetime::Real,
         investment::Real, replacement::Real, salvage::Real,
@@ -171,7 +173,61 @@ function component_costs(mg_project::Project, lifetime::Real,
     return CostFactors(total_cost, investment, replacement_cost, om_cost, fuel_cost, salvage_cost)
 end
 
+"""
+    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
 
+Compute net present cost factors for a `DispatchableGenerator`.
+"""
+function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+    rating = gen.power_rated
+    investment = gen.investment_price * rating
+    replacement = investment * gen.replacement_price_ratio
+    salvage = investment * gen.salvage_price_ratio
+    om_annual = gen.om_price_hours * oper_stats.gen_hours * rating
+    fuel_annual = gen.fuel_price * oper_stats.gen_fuel
+
+    # effective generator lifetime (in years)
+    lifetime = gen.lifetime_hours / oper_stats.gen_hours
+
+    c = component_costs(
+        mg_project, lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
+    return [c.total, c.investment, c.om, c.replacement, -c.salvage, c.fuel]
+end
+
+"""
+    component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+
+Compute net present cost factors for a `Battery`.
+"""
+function component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+    rating = bt.energy_rated
+    investment = bt.investment_price * rating
+    replacement = investment * bt.replacement_price_ratio
+    salvage = investment * bt.salvage_price_ratio
+    om_annual = bt.om_price * rating
+    fuel_annual = 0.0
+
+    # effective battery lifetime (in years)
+    if oper_stats.storage_cycles > 0.0
+        lifetime = min(
+            bt.lifetime_cycles/oper_stats.storage_cycles, # cycling lifetime
+            bt.lifetime_calendar # calendar lifetime
+        )
+    else
+        lifetime = bt.lifetime_calendar
+    end
+
+    c = component_costs(
+        mg_project, lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
+
+    return [c.total, c.investment, c.om, c.replacement, -c.salvage]
+end
 
 """
     component_costs(nd::NonDispatchableSource, mg_project::Project)
@@ -228,64 +284,8 @@ function component_costs(pv::PVInverter, mg_project::Project)
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
-    return [c_ac.total + c_dc.total,
-            c_ac.investment + c_dc.investment,
-            c_ac.om + c_dc.om,
-            c_ac.replacement+c_dc.replacement,
-            -(c_ac.salvage+c_dc.salvage)]
-end
 
-"""
-    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
-
-Compute net present cost factors for a `DispatchableGenerator`.
-"""
-function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
-    rating = gen.power_rated
-    investment = gen.investment_price * rating
-    replacement = investment * gen.replacement_price_ratio
-    salvage = investment * gen.salvage_price_ratio
-    om_annual = gen.om_price_hours * oper_stats.gen_hours * rating
-    fuel_annual = gen.fuel_price * oper_stats.gen_fuel
-
-    # effective generator lifetime in years
-    lifetime = gen.lifetime_hours / oper_stats.gen_hours
-
-    c = component_costs(
-        mg_project, lifetime,
-        investment, replacement, salvage,
-        om_annual, fuel_annual
-        )
-    return [c.total, c.investment, c.om, c.replacement, -c.salvage, c.fuel]
-end
-
-"""
-    component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
-
-Compute net present cost factors for a `Battery`.
-"""
-function component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
-    rating = bt.energy_rated
-    investment = bt.investment_price * rating
-    replacement = investment * bt.replacement_price_ratio
-    salvage = investment * bt.salvage_price_ratio
-    om_annual = bt.om_price * rating
-    fuel_annual = 0.0
-
-    if oper_stats.storage_cycles > 0.0
-        lifetime = min(
-            bt.lifetime_cycles/oper_stats.storage_cycles, # cycling lifetime
-            bt.lifetime_calendar # calendar lifetime
-        )
-    else
-        lifetime = bt.lifetime_calendar
-    end
-    c = component_costs(
-        mg_project, lifetime,
-        investment, replacement, salvage,
-        om_annual, fuel_annual
-        )
-
+    c = c_ac + c_dc
     return [c.total, c.investment, c.om, c.replacement, -c.salvage]
 end
 

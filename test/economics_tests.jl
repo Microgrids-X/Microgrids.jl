@@ -27,3 +27,61 @@
     @test ctot.fuel == c1.fuel + c2.fuel
     @test ctot.salvage == c1.salvage + c2.salvage
 end
+
+
+@testset "Economics: entire Microgrid" begin
+    include("typical_parameters.jl")
+
+    # Dummy time series (not used since operation simulation is bypassed)
+    Pload = [1., 1., 1.]
+    irradiance = [0, 0.5, 1.0]
+
+    # Components:
+    generator = DispatchableGenerator(power_rated_gen,
+        fuel_intercept, fuel_slope, fuel_price,
+        investment_price_gen, om_price_gen, lifetime_gen,
+        load_ratio_min,
+        replacement_price_ratio, salvage_price_ratio, fuel_unit)
+    battery = Battery(energy_rated,
+        investment_price_sto, om_price_sto, lifetime_sto, lifetime_cycles,
+        charge_rate, discharge_rate, loss_factor_sto, SoC_min, SoC_ini,
+        replacement_price_ratio, salvage_price_ratio)
+    photovoltaic = Photovoltaic(power_rated_pv, irradiance,
+        investment_price_pv, om_price_pv,
+        lifetime_pv, derating_factor_pv,
+        replacement_price_ratio, salvage_price_ratio)
+
+    # Microgrid, with and without a 5% discount rate:
+    proj0 = Project(lifetime, 0.0, timestep, "€")
+    proj5 = Project(lifetime, discount_rate, timestep, "€")
+
+    mg0 = Microgrid(proj0, Pload, generator, battery, [photovoltaic]);
+    mg5 = Microgrid(proj5, Pload, generator, battery, [photovoltaic]);
+
+    # Bypass of the operation simulation + aggregation:
+    served_energy = 6.774979e6
+    gen_hours = 3327.0
+    gen_fuel = 670880.8
+    storage_cycles = 209.08
+    spilled_max = 4569.3
+    renew_rate = 58.74029
+    # Remark: 1e10 and 1e9 indicates fake values which should be nonzero
+    # but do not influence economic evaluation
+    oper_stats = OperationStats(
+        # load stats
+        served_energy, 0.0, 0.0, 0.0, 0.0, 0.0,
+        # gen stats
+        1e10, gen_hours, gen_fuel,
+        # storage stats
+        storage_cycles, 1e10, 1e10, 1e9,
+        # Non-dispatchable (typ. renewables) sources stats
+        1e10, spilled_max, 0.9, 1e11, 1e10, renew_rate)
+
+    costs0 = economics(mg0, oper_stats)
+    costs5 = economics(mg5, oper_stats)
+
+    # NPC validations
+    @test round(costs0.npc/1e6; digits=3) == 41.697 # M$, without discount
+    @test round(costs5.npc/1e6; digits=3) == 28.353 # M$, with 5% discount
+    # TODO: test LCOE
+end
