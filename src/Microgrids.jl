@@ -1,13 +1,11 @@
 module Microgrids
 
-import Base
-
 export simulate,
        NonDispatchables,
        Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
        OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,
-       CostFactors, +, MicrogridCosts, component_costs, economics
+       CostFactors, MicrogridCosts, component_costs, economics
 
 include("components.jl")
 include("dispatch.jl")
