@@ -35,18 +35,24 @@
             0., 0., 0., 0., 0., 0.)
 
         # Case of zero usage of generator
-        expected_costs_0 = [800.0, 4000.0, 0.0, 0.0,
-                            3200.0, 0.0]
-        component_costs(gen, proj0, oper_stats(0., 0.))
-        @test round.(
+        c_0 = CostFactors(
+            800.0, 4000.0, 0.0, 0.0, 0.0, -3200.0
+        )
+        @test round(
             component_costs(gen, proj0, oper_stats(0., 0.));
-            digits=3) == expected_costs_0
+            digits=3) == c_0
         # Case of non zero usage of generator
-        expected_costs_fuel = [45812.4, 4000.0, 0.2*lifetime_mg, 0.0,
-                               3200*14970/15000, 1500*lifetime_mg]
-        @test round.(
+        c_fuel = CostFactors(
+            total=45812.4,
+            investment=4000.0,
+            replacement=0.0,
+            om=0.2*lifetime_mg,
+            fuel=1500*lifetime_mg,
+            salvage=-3200*14970/15000
+        )
+        @test round(
             component_costs(gen, proj0, oper_stats(1., 1000.));
-            digits=3 ) == expected_costs_fuel
+            digits=3 ) == c_fuel
         # TODO: add zero usage of generator of size 0...
     end
 end
@@ -88,12 +94,36 @@ end
     aggr100C = oper_stats(100.0) # not enough cycles to reduce the lifetime
     aggr300C = oper_stats(300.0) # lifetime reduced to 3000/300 = 10 yr
 
-    # no discount, with increasing amount of cycling
-    @test component_costs(batt, proj0, aggr0C)   == [2660.0, 700.0, 1750.0,  630.0, 420.0]
-    @test component_costs(batt, proj0, aggr100C) == [2660.0, 700.0, 1750.0,  630.0, 420.0]
-    @test component_costs(batt, proj0, aggr300C) == [3430.0, 700.0, 1750.0, 1260.0, 280.0]
-    # with discount
-    @test round.(component_costs(batt, proj5, aggr0C); digits=2) ==  [1799.99, 700.0, 986.58, 237.44, 124.03]
+    # Costs with no discount, with increasing amount of cycling
+    c_0C = CostFactors( # cost with no to little cycling (calendar lifetime dominant)
+        total=2660.0,
+        investment=700.0,
+        replacement=700.0*0.9, # 630.0
+        om=70.0*25, # 1750.0
+        fuel=0.0,
+        salvage=-420.0
+    )
+    c_300C = CostFactors( # cost with lifetime dominated by cycling
+        total=3430.0,
+        investment=700.0,
+        replacement=700.0*0.9*2, # 1260.0
+        om=70.0*25, # 1750.0
+        fuel=0.0,
+        salvage=-280.0
+    )
+    @test component_costs(batt, proj0, aggr0C)   == c_0C
+    @test component_costs(batt, proj0, aggr100C) == c_0C # 100 c/y is like 0
+    @test component_costs(batt, proj0, aggr300C) == c_300C
+    # Costs *with* discount
+    c5_0C = CostFactors(
+        total=1799.99,
+        investment=700.0,
+        replacement=237.44,
+        om=986.58,
+        fuel=0.0,
+        salvage=-124.03
+    )
+    @test round(component_costs(batt, proj5, aggr0C); digits=2) == c5_0C
 end
 
 
@@ -123,10 +153,24 @@ end
         proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
         proj5 = Project(lifetime_mg, 0.05, 1., "€") # 5% discount
 
-        expected_costs0 = [24000.00, 10000.0, 6000.00, 12000.00, 4000.00]
-        expected_costs5 = [16671.65, 10000.0, 3074.49,  4522.67,  925.51]
-        @test component_costs(pv, proj0) == expected_costs0
-        @test round.(component_costs(pv, proj5); digits=2) == expected_costs5
+        c0 = CostFactors(
+            total=24000.00,
+            investment=10000.0,
+            replacement=12000.00,
+            om=6000.00,
+            fuel=0.0,
+            salvage=-4000.00
+        )
+        c5 = CostFactors(
+            total=16671.65,
+            investment=10000.0,
+            replacement=4522.67,
+            om=3074.49,
+            fuel=0.0,
+            salvage=-925.51
+        )
+        @test component_costs(pv, proj0) == c0
+        @test round(component_costs(pv, proj5); digits=2) == c5
     end
 end
 
@@ -162,7 +206,14 @@ end
     @testset "PVInverter: Economics" begin
         lifetime_mg = 30.
         proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
-        expected_costs = [19950.0, 11500.0, 5750.0, 11500.0, 8800.0]
-        @test round.(component_costs(pvi, proj0); digits=3) == expected_costs
+        c = CostFactors(
+            total=19950.0,
+            investment=11500.0,
+            replacement=11500.0,
+            om=5750.0,
+            fuel=0.0,
+            salvage=-8800.0
+        )
+        @test round(component_costs(pvi, proj0); digits=3) == c
     end
 end

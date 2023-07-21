@@ -19,6 +19,7 @@
     total2 = investment2 + replacement2 + om2 + fuel2 + salvage2
     c2 =  CostFactors(total2, investment2, replacement2, om2, fuel2, salvage2)
 
+    # Addition
     ctot = c1 + c2
     @test ctot.total == c1.total + c2.total
     @test ctot.investment == c1.investment + c2.investment
@@ -26,6 +27,32 @@
     @test ctot.om == c1.om + c2.om
     @test ctot.fuel == c1.fuel + c2.fuel
     @test ctot.salvage == c1.salvage + c2.salvage
+
+    # sum using the sum function (useful to sum costs of nondispatchables)
+    @test sum([c1, c2]) == ctot
+    @test sum([c1, c2, c2]) != ctot
+
+    # Multiplication with scalar
+    @test c1+c1 == 2*c1
+    @test c1+c1 == c1*2
+    # Division with scalar
+    @test (c1+c1)/2 == c1
+
+    # Cost rounding
+    investment3 = 1.11
+    replacement3 = 2.22
+    om3 = 3.33
+    fuel3 = 4.44
+    salvage3 = -0.555
+    total3 = investment3 + replacement3 + om3 + fuel3 + salvage3
+    c3 =  CostFactors(total3, investment3, replacement3, om3, fuel3, salvage3)
+    @test round(c3; digits=1) == CostFactors(
+        10.5, 1.1, 2.2, 3.3, 4.4, -0.6
+    )
+    @test round(c3; sigdigits=2) == CostFactors(
+        11.0, 1.1, 2.2, 3.3, 4.4, -0.56
+    )
+
 end
 
 
@@ -83,5 +110,26 @@ end
     # NPC validations
     @test round(costs0.npc/1e6; digits=3) == 41.697 # M$, without discount
     @test round(costs5.npc/1e6; digits=3) == 28.353 # M$, with 5% discount
-    # TODO: test LCOE
+    # LCOE
+    @test round(costs0.lcoe; digits=3) == 0.246 # $/kWh, without discount
+    @test round(costs5.lcoe; digits=3) == 0.297 # $/kWh, with 5% discount
+    # Cost factors of the system
+    sys_c0M = CostFactors(
+        total=41.697,
+        investment=11.07,
+        replacement=6.75,
+        om=8.244,
+        fuel=16.772,
+        salvage=-1.139
+    )
+    sys_c5M = CostFactors(
+        total=28.353,
+        investment=11.07, # same as with no discount
+        replacement=3.516,
+        om=4.648,
+        fuel=9.455,
+        salvage=-0.336
+    )
+    @test round(costs0.system/1e6; digits=3) == sys_c0M # M$, without discount
+    @test round(costs5.system/1e6; digits=3) == sys_c5M # M$, with 5% discount
 end
