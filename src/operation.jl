@@ -34,7 +34,7 @@ end
 
 (simulation duration is assumed to be 1 year)
 """
-struct OperationStats
+mutable struct OperationStats
     # Load statistics
     "energy actually served to the load (kWh/y)"
     served_energy
@@ -89,7 +89,7 @@ end
 Simulate the annual operation of the microgrid `mg` and return the
 hourly operation variables `OperVarsTraj`.
 """
-function operation(mg::Microgrid)
+function operation(mg::Microgrid, recorder=false)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
     Topt = typeof(mg).parameters[1]
 
@@ -100,6 +100,8 @@ function operation(mg::Microgrid)
 
     # Desired net load
     Pnl_request = mg.load - renew_potential
+
+    # TODO future version : no need to create renew_potential and Pnl_request arrays
 
     # Fixed parameters and short aliases
     K = length(mg.load)
@@ -120,28 +122,94 @@ function operation(mg::Microgrid)
     Pspill = zeros(Topt,K)
     Pshed = zeros(Topt,K)
 
+    # Initialization of loop variables
     # Initial storage state
     Esto_ini = mg.storage.SoC_ini * mg.storage.energy_rated
-    Esto[1] = Esto_ini
+    Esto = Esto_ini
+    # Operation statistics counters initialiazed at zero
+    op_st = OperationStats(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0,0.0, 0.0)
+    shed_duration = 0.0 # duration of current load shedding event (h)
 
-    for k=1:K
-        # Storage energy and power limits
-        Psto_emin = - (Esto_max - Esto[k]) / ((1 - sto_loss) * dt)
-        Psto_emax = (Esto[k] - Esto_min) / ((1 + sto_loss) * dt)
-        Psto_dmax[k] = min(Psto_emax, Psto_pmax)
-        Psto_cmax[k] = max(Psto_emin, Psto_pmin)
-
-        # dispatch
-        Pnl[k], Pgen[k], Psto[k], Pspill[k], Pshed[k] = dispatch(Pnl_request[k], Psto_cmax[k], Psto_dmax[k], mg.generator.power_rated)
-
-        # Storage dynamics
-        if k < K
-            Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
-        end
+    if recorder
+        #init
     end
 
-    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen, Esto, Psto, Psto_dmax, Psto_cmax, Pspill)
-    return oper_traj
+    for k=1:K
+        ### Decide energy dispatch
+        # Storage energy and power limits
+        Psto_emin = - (Esto_max - Esto) / ((1 - sto_loss) * dt)
+        Psto_emax = (Esto - Esto_min) / ((1 + sto_loss) * dt)
+        Psto_dmax = min(Psto_emax, Psto_pmax)
+        Psto_cmax = max(Psto_emin, Psto_pmin)
+
+        # dispatch
+        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, mg.generator.power_rated)
+
+        # optionally record values in trajectories
+        if recorder
+            #record
+        end
+
+        # Storage dynamics
+        Esto = Esto - (Psto + sto_loss*abs(Psto)) * dt
+
+        ### Aggregate operation statistics
+        # Load statistics
+        op_st.shed_energy += Pshed*dt
+        op_st.shed_max = max(op_st.shed_max, Pshed)
+        # TODO: add relaxation
+        if Pshed > 0.0
+            op_st.shed_hours += dt
+            shed_duration += dt
+            op_st.shed_duration_max = max(op_st.shed_duration_max, shed_duration)
+        else
+            # reset duration of current load shedding event
+            shed_duration = 0.0
+        end
+
+        # Dispatchable generator statistics
+        # TODO: add relaxation
+        if Pgen > 0.0 # Generator ON
+            op_st.gen_energy += Pgen*dt
+            op_st.gen_hours += dt
+            fuel_rate = mg.generator.fuel_intercept * mg.generator.power_rated +
+                          mg.generator.fuel_slope * Pgen # (L/h)
+            op_st.gen_fuel += fuel_rate*dt
+        end
+
+        # Energy storage (e.g. battery) statistics
+        if Psto > 0.0 # discharge
+            op_st.storage_dis_energy += Psto*dt
+        else
+            op_st.storage_char_energy -= Psto*dt
+        end
+
+        # Non-dispatchable (typ. renewables) sources statistics
+        op_st.spilled_energy += Pspill*dt
+        op_st.spilled_max = max(op_st.spilled_max, Pspill)
+
+    end # for each instant k
+
+    if recorder
+        # record last instant of Esto (length K+1)
+    end
+
+    # Some more aggregated operation statistics
+    load_energy = sum(mg.load)*dt
+    op_st.served_energy = load_energy - op_st.shed_energy
+    op_st.shed_rate = op_st.shed_energy / load_energy
+
+    op_st.storage_loss_energy = op_st.storage_char_energy -
+        op_st.storage_dis_energy - (Esto - Esto_ini)
+    storage_throughput = op_st.storage_char_energy + op_st.storage_dis_energy
+    op_st.storage_cycles = storage_throughput / (2*mg.storage.energy_rated)
+
+    op_st.renew_potential_energy = sum(renew_potential)
+    op_st.renew_energy = op_st.renew_potential_energy - op_st.spilled_energy
+    op_st.renew_rate = 1 - op_st.gen_energy/op_st.served_energy
+    op_st.spilled_rate = op_st.spilled_energy / op_st.renew_potential_energy
+
+    return op_st
 end
 
 """

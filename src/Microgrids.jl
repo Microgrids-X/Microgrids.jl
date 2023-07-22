@@ -16,16 +16,13 @@ include("operation.jl")
 include("economics.jl")
 
 function simulate(mg::Microgrid)
-    # Run the microgrid operation
-    opervarstraj = operation(mg)
-
-    # Aggregate the operation variables
-    opervarsaggr = aggregation(mg, opervarstraj)
+    # Run the microgrid operation and returs aggregated stats
+    oper_stats = operation(mg)
 
     # Eval the microgrid costs
-    costs = economics(mg, opervarsaggr)
+    costs = economics(mg, oper_stats)
 
-    return (opervarstraj = opervarstraj, opervarsaggr = opervarsaggr, costs = costs)
+    return (oper_stats = oper_stats, costs = costs)
 end
 
 end
