@@ -113,7 +113,7 @@ struct Battery{Topt<:Real}
 end
 
 "Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
-abstract type NonDispatchableSource end
+abstract type NonDispatchableSource{Topt<:Real} end
 
 """Solar photovoltaic generator (including AC/DC converter)
 
@@ -127,7 +127,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
+struct Photovoltaic{Topt} <: NonDispatchableSource{Topt}
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -165,7 +165,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct PVInverter{Topt<:Real} <: NonDispatchableSource
+struct PVInverter{Topt} <: NonDispatchableSource{Topt}
     # Main technical parameters
     "rated AC (inverter) power (kW)"
     power_rated::Topt
@@ -205,7 +205,7 @@ end
 
 See `capacity_from_wind` to compute capacity factor time series from wind speed.
 """
-struct WindPower{Topt<:Real} <: NonDispatchableSource
+struct WindPower{Topt} <: NonDispatchableSource{Topt}
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -271,5 +271,5 @@ struct Microgrid{Topt<:Real}
     "energy storage (e.g. battery)"
     storage::Battery{Topt}
     "non-dispatchable sources (e.g. renewables like wind and solar)"
-    nondispatchables #::Vector{NonDispatchableSource}
+    nondispatchables::Vector{<:NonDispatchableSource{Topt}}
 end

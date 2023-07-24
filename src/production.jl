@@ -3,9 +3,20 @@
 
 Return the power output of the `photovoltaic` source.
 """
-function production(photovoltaic::Photovoltaic)
+function production(photovoltaic::Photovoltaic{T})::Vector{T} where {T<:Real}
     power_output = photovoltaic.derating_factor * photovoltaic.power_rated *
                    photovoltaic.irradiance
+    return power_output
+end
+
+"""
+    production(photovoltaic::Photovoltaic, k::Int)
+
+Return the power output of the `photovoltaic` source at instant `k`.
+"""
+function production(photovoltaic::Photovoltaic{T}, k::Int)::T where {T<:Real}
+    power_output = photovoltaic.derating_factor * photovoltaic.power_rated *
+                   photovoltaic.irradiance[k]
     return power_output
 end
 
@@ -14,14 +25,25 @@ end
 
 Return the power output of the `photovoltaic` source.
 """
-function production(photovoltaic::PVInverter)
+function production(photovoltaic::PVInverter{T})::Vector{T} where {T<:Real}
     PDC_rated=photovoltaic.ILR*photovoltaic.power_rated
-    T = typeof(PDC_rated)
     PAC=zeros(T, length(photovoltaic.irradiance))
     for i=1:length(photovoltaic.irradiance)
         PDC_i=photovoltaic.irradiance[i]*PDC_rated*photovoltaic.derating_factor
         PAC[i]=min(PDC_i,photovoltaic.power_rated)
     end
+    return PAC
+end
+
+"""
+    production(photovoltaic::PVInverter, k::Int)
+
+Return the power output of the `photovoltaic` source at instant `k`.
+"""
+function production(photovoltaic::PVInverter{T}, k::Int)::T where {T<:Real}
+    PDC_rated=photovoltaic.ILR*photovoltaic.power_rated
+    PDC=photovoltaic.irradiance[k]*PDC_rated*photovoltaic.derating_factor
+    PAC=min(PDC,photovoltaic.power_rated)
     return PAC
 end
 

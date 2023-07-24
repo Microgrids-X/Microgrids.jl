@@ -93,14 +93,6 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
     Topt = typeof(mg).parameters[1]
 
-    # Renewable power generation
-    # (remark on naming convention: all non-dispatchable sources are assumed renewable!)
-    renew_productions = collect(production(nd) for nd in mg.nondispatchables)
-    renew_potential = sum(renew_productions)::Vector{Topt}
-
-    # Desired net load
-    Pnl_request = mg.load - renew_potential
-
     # TODO future version : no need to create renew_potential and Pnl_request arrays
 
     # Fixed parameters and short aliases
@@ -130,6 +122,13 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     end
 
     for k=1:K
+        ### Compute net load (e.g. renew_potential)
+        # Renewable power generation
+        # (remark on naming convention: all non-dispatchable sources are assumed renewable!)
+        renew_potential = sum(production(nd, k) for nd in mg.nondispatchables)::Topt
+        # Desired net load
+        Pnl_request = mg.load[k] - renew_potential
+
         ### Decide energy dispatch
         # Storage energy and power limits
         Psto_emin = - (Esto_max - Esto) / ((1 - sto_loss) * dt)
@@ -138,7 +137,7 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
         Psto_cmax = max(Psto_emin, Psto_pmin)
 
         # dispatch
-        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_max)
+        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request, Psto_cmax, Psto_dmax, Pgen_max)
 
         # optionally record values in trajectories
         if recorder
@@ -207,6 +206,7 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
         end
 
         # Non-dispatchable (typ. renewables) sources statistics
+        op_st.renew_potential_energy += renew_potential*dt
         op_st.spilled_energy += Pspill*dt
         op_st.spilled_max = max(op_st.spilled_max, Pspill)
 
@@ -225,7 +225,6 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     storage_throughput = op_st.storage_char_energy + op_st.storage_dis_energy
     op_st.storage_cycles = storage_throughput / (2*mg.storage.energy_rated)
 
-    op_st.renew_potential_energy = sum(renew_potential)
     op_st.renew_energy = op_st.renew_potential_energy - op_st.spilled_energy
     op_st.renew_rate = 1 - op_st.gen_energy/op_st.served_energy
     op_st.spilled_rate = op_st.spilled_energy / op_st.renew_potential_energy
