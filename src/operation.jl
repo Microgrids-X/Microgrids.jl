@@ -34,52 +34,52 @@ end
 
 (simulation duration is assumed to be 1 year)
 """
-mutable struct OperationStats
+@kwdef mutable struct OperationStats{T<:Real}
     # Load statistics
     "energy actually served to the load (kWh/y)"
-    served_energy
+    served_energy::T
     "shed energy, that is not served to the load (kWh/y)"
-    shed_energy
+    shed_energy::T
     "maximum load shedding power (kW)"
-    shed_max
+    shed_max::T
     "cumulated duration of load shedding (h/y)"
-    shed_hours
+    shed_hours::T
     "maximum consecutive duration of load shedding (h)"
-    shed_duration_max
+    shed_duration_max::T
     "ratio of shed energy to the desired load (∈ [0,1])"
-    shed_rate
+    shed_rate::T
 
     # Dispatchable generator statistics
     "energy supplied by the dispatchable generator (kWh/y)"
-    gen_energy
+    gen_energy::T
     "cumulated operating hours of the dispatchable generator (h/y)"
-    gen_hours
+    gen_hours::T
     "fuel consumption (L/y)"
-    gen_fuel
+    gen_fuel::T
 
     # Energy storage (e.g. battery) statistics
     "cycling of the energy storage (cycles/y)"
-    storage_cycles
+    storage_cycles::T
     "energy charged into the energy storage (kWh/y)"
-    storage_char_energy
+    storage_char_energy::T
     "energy discharged out of the energy storage (kWh/y)"
-    storage_dis_energy
+    storage_dis_energy::T
     "energy lossed in the energy storage (kWh/y)"
-    storage_loss_energy
+    storage_loss_energy::T
 
     # Non-dispatchable (typ. renewables) sources statistics
     "spilled energy (typ. from excess of renewables) (kWh/y)"
-    spilled_energy
+    spilled_energy::T
     "maximum spilled power (typ. from excess of renewables) (kW)"
-    spilled_max
+    spilled_max::T
     "ratio of spilled energy to the energy potentially supplied by renewables (∈ [0,1])"
-    spilled_rate
+    spilled_rate::T
     "energy potentially supplied by renewables in the absence spillage (kWh/y)"
-    renew_potential_energy
+    renew_potential_energy::T
     "energy actually supplied by renewables when substracting spillage (kWh/y)"
-    renew_energy
+    renew_energy::T
     "ratio of energy actually supplied by renewables (net of storage loss) to the energy served to the load (∈ [0,1])"
-    renew_rate
+    renew_rate::T
 end
 
 
@@ -89,7 +89,7 @@ end
 Simulate the annual operation of the microgrid `mg` and return the
 hourly operation variables `OperVarsTraj`.
 """
-function operation(mg::Microgrid, recorder=false)
+function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
     Topt = typeof(mg).parameters[1]
 
@@ -106,28 +106,23 @@ function operation(mg::Microgrid, recorder=false)
     # Fixed parameters and short aliases
     K = length(mg.load)
     dt = mg.project.timestep
+    Pgen_max = mg.generator.power_rated
     Esto_max = mg.storage.energy_rated
     Esto_min = mg.storage.SoC_min * Esto_max
     Psto_pmax =  mg.storage.discharge_rate * Esto_max
     Psto_pmin = -mg.storage.charge_rate * Esto_max # <0 in line with the generator convention for Psto
     sto_loss = mg.storage.loss_factor
 
-    # Initialization of loop variables
-    Pnl = zeros(Topt,K)
-    Pgen = zeros(Topt,K)
-    Esto = zeros(Topt,K+1)
-    Psto = zeros(Topt,K)
-    Psto_dmax = zeros(Topt,K)
-    Psto_cmax = zeros(Topt,K)
-    Pspill = zeros(Topt,K)
-    Pshed = zeros(Topt,K)
+    # Load statistics
+    load_energy = sum(mg.load)*dt
+    Pload_avg = load_energy/(K*dt) # kW
 
     # Initialization of loop variables
     # Initial storage state
     Esto_ini = mg.storage.SoC_ini * mg.storage.energy_rated
     Esto = Esto_ini
     # Operation statistics counters initialiazed at zero
-    op_st = OperationStats(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0,0.0, 0.0)
+    op_st = OperationStats{Topt}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0,0.0, 0.0)
     shed_duration = 0.0 # duration of current load shedding event (h)
 
     if recorder
@@ -143,7 +138,7 @@ function operation(mg::Microgrid, recorder=false)
         Psto_cmax = max(Psto_emin, Psto_pmin)
 
         # dispatch
-        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, mg.generator.power_rated)
+        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_max)
 
         # optionally record values in trajectories
         if recorder
@@ -155,25 +150,52 @@ function operation(mg::Microgrid, recorder=false)
 
         ### Aggregate operation statistics
         # Load statistics
-        op_st.shed_energy += Pshed*dt
-        op_st.shed_max = max(op_st.shed_max, Pshed)
-        # TODO: add relaxation
-        if Pshed > 0.0
-            op_st.shed_hours += dt
-            shed_duration += dt
+        if Pshed > 0.0 # load shedding
+            op_st.shed_energy += Pshed*dt
+            op_st.shed_max = max(op_st.shed_max, Pshed)
+
+            if ε > 0.0 # relaxation of discontinuities ON
+                Pshed_norm = Pshed / (ε * Pload_avg)
+                if Pshed_norm <= 1.0
+                    # relaxation of discontinuous load statistics for small Pshed
+                    op_st.shed_hours += Pshed_norm * dt
+                    shed_duration += Pshed_norm * dt
+                else
+                    op_st.shed_hours += dt
+                    shed_duration += Pshed_norm * dt
+                end
+            else # relaxation OFF
+                op_st.shed_hours += dt
+                shed_duration += Pshed_norm * dt
+            end
+
             op_st.shed_duration_max = max(op_st.shed_duration_max, shed_duration)
-        else
-            # reset duration of current load shedding event
+
+        else # no load shedding
+            # reset duration counter of current load shedding event:
             shed_duration = 0.0
         end
 
         # Dispatchable generator statistics
-        # TODO: add relaxation
         if Pgen > 0.0 # Generator ON
             op_st.gen_energy += Pgen*dt
-            op_st.gen_hours += dt
-            fuel_rate = mg.generator.fuel_intercept * mg.generator.power_rated +
-                          mg.generator.fuel_slope * Pgen # (L/h)
+            if ε > 0.0 # relaxation of discontinuities ON
+                Pgen_norm = Pgen / (ε * Pgen_max)
+                if Pgen_norm <= 1.0
+                    # relaxation of discontinuous generator statistics for small Pgen
+                    op_st.gen_hours += Pgen_norm * dt
+                    fuel_rate = Pgen_norm * mg.generator.fuel_intercept * Pgen_max +
+                                mg.generator.fuel_slope * Pgen # (L/h)
+                else
+                    op_st.gen_hours += dt
+                    fuel_rate = mg.generator.fuel_intercept * Pgen_max +
+                                  mg.generator.fuel_slope * Pgen # (L/h)
+                end
+            else # relaxation OFF
+                op_st.gen_hours += dt
+                fuel_rate = mg.generator.fuel_intercept * Pgen_max +
+                              mg.generator.fuel_slope * Pgen # (L/h)
+            end
             op_st.gen_fuel += fuel_rate*dt
         end
 
@@ -195,7 +217,6 @@ function operation(mg::Microgrid, recorder=false)
     end
 
     # Some more aggregated operation statistics
-    load_energy = sum(mg.load)*dt
     op_st.served_energy = load_energy - op_st.shed_energy
     op_st.shed_rate = op_st.shed_energy / load_energy
 
