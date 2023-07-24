@@ -1,34 +1,35 @@
-"""Operation variables (time series) from a simulated Microgrid operation
-
-(simulation duration is assumed to be 1 year)
-"""
-struct OperationTraj{T<:Real}
-    # load
-    #= "Net load at each time instant after using the renewables power (kW)"
-    Pnl_req =#
-    "Net load at each time instant after dispatch (kW)"
-    power_net_load::Vector{T}
-    "Unmet load/Load shedding power at each time instant (kW)"
-    power_shedding::Vector{T}
-    # non dispatchable (renewables)
-    "renewable power potential (before spillage) (kW)"
-    Prenew_pot::Vector{T}
-    # diesel generator
-    "Diesel generator power at each time instant (kW)"
-    Pgen::Vector{T}
-    # battery
-    "Battery energy at each time instant (kWh)"
-    Ebatt::Vector{T}
-    "Battery power at each time instant (kW)"
-    Pbatt::Vector{T}
-    "Maximum battery discharge power at time t (kW)"
-    Pbatt_dmax::Vector{T}
-    "Maximum battery charge power at time t (kW)"
-    Pbatt_cmax::Vector{T}
-    # renewables sources
-    "Renewables curtailment power at each time instant (kW)"
-    power_curtailment::Vector{T}
+"""Recorder for trajectories of operational variables"""
+struct TrajRecorder{T<:Real}
+    values::Dict{Symbol,Vector{T}}
 end
+
+"""Initialize a TrajRecorder for trajectories of operational variables
+of given names, with arrays prescribed length.
+
+Example: recorder = TrajRecorder(var1=10, var2=11)
+"""
+function TrajRecorder(T; kwargs...)
+    recorder = TrajRecorder{T}(Dict{Symbol,Vector{T}}())
+
+    for (name, traj_length) in kwargs
+        recorder.values[name] = zeros(T, traj_length)
+    end
+
+    return recorder
+end
+
+"""Record trajectory values at index `k`.
+
+`k` should be in [1, `length`], for the given `length` provided at initialization.
+
+Example: rec(recorder, 5, var1=0.8)
+"""
+function rec(recorder::TrajRecorder, k::Int; kwargs...)
+    for (name, value) in kwargs
+        recorder.values[name][k] = value
+    end
+end
+
 
 """Aggregated statistics over the simulated Microgrid operation
 
@@ -87,9 +88,9 @@ end
     operation(mg::Microgrid)
 
 Simulate the annual operation of the microgrid `mg` and return the
-hourly operation variables `OperVarsTraj`.
+hourly operation variables `OperVarsTraj`. TODO: update doctring.
 """
-function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
+function operation(mg::Microgrid, ε::Real=0.0, record=false::Bool)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
     Topt = typeof(mg).parameters[1]
 
@@ -123,8 +124,8 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     op_st = OperationStats{Topt}(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0,0.0, 0.0)
     shed_duration = 0.0 # duration of current load shedding event (h)
 
-    if recorder
-        #init
+    if record
+        recorder = TrajRecorder(Topt; Prep=K, Pgen=K, Psto=K, Esto=K+1, Pspill=K, Pshed=K)
     end
 
     for k=1:K
@@ -141,9 +142,12 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
         # Dispatch
         Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request, Psto_cmax, Psto_dmax, Pgen_max)
 
-        # optionally record values in trajectories
-        if recorder
-            #record
+        # Record trajectories (optional)
+        if record
+            rec(recorder, k,
+                Prep=renew_potential[k],
+                Pgen=Pgen, Psto=Psto, Esto=Esto,
+                Pspill=Pspill, Pshed=Pshed)
         end
 
         # Storage dynamics
@@ -213,8 +217,8 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
 
     end # for each instant k
 
-    if recorder
-        # record last instant of Esto (length K+1)
+    if record
+        rec(recorder, K+1, Esto=Esto) # Esto at last instant
     end
 
     # Some more aggregated operation statistics
@@ -232,119 +236,4 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     op_st.spilled_rate = op_st.spilled_energy / op_st.renew_potential_energy
 
     return op_st
-end
-
-"""
-    aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
-
-Aggregates operation time series `oper_traj` into yearly statistics
-for the the microgrid `mg` (returned as an `OperationStats` object).
-
-Discontinuous statistics can optionally be relaxed (smoothed)
-using the relaxation parameter `ε`:
-- 0.0 means no relaxation (default value)
-- 1.0 yields the strongest relaxation
-
-when using relaxation, a value between 0.05 and 0.30 is suggested
-"""
-function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
-    ### Retrieve parameters
-    dt = mg.project.timestep
-    K = length(mg.load)
-
-    ### Compute simple yearly statistics (sum, max...):
-    # Load statistics
-    load_energy = sum(mg.load) * dt # kWh/y
-    shed_energy = sum(oper_traj.power_shedding) * dt # kWh/y
-    served_energy = load_energy - shed_energy # kWh/y
-    shed_max = maximum(oper_traj.power_shedding) # kW
-    shed_rate = shed_energy / load_energy
-
-    # Dispatchable generator statistics
-    gen_energy = sum(oper_traj.Pgen) * dt # kWh/y
-
-    # Energy storage (e.g. battery) statistics
-    pos(x) = x >= 0.0 ? x : 0.0 # positive part
-    neg(x) = x <= 0.0 ? -x : 0.0 # negative part
-    storage_char_energy = sum(neg, oper_traj.Pbatt) * dt # kWh/y
-    storage_dis_energy  = sum(pos, oper_traj.Pbatt) * dt # kWh/y
-    storage_cycles = (storage_char_energy + storage_dis_energy) /
-                     (2*mg.storage.energy_rated) # cycles/y
-    Efin = oper_traj.Ebatt[end]
-    Eini = oper_traj.Ebatt[1]
-    storage_loss_energy = storage_char_energy - storage_dis_energy -
-                          (Efin - Eini) # kWh/y
-
-    # Non-dispatchable (typ. renewables) sources statistics
-    spilled_energy = sum(oper_traj.power_curtailment) * dt # kWh/y
-    spilled_max = maximum(oper_traj.power_curtailment) # kW
-    renew_potential_energy = sum(oper_traj.Prenew_pot) * dt # kWh/y
-    spilled_rate = spilled_energy / renew_potential_energy
-    renew_energy = renew_potential_energy - spilled_energy
-    renew_rate = 1 - gen_energy/served_energy
-
-    ### Iterative computation of more complex yearly statistics
-
-    # Initialization of integrators:
-    shed_hours = 0.0 # h/y
-    shed_duration_max = 0.0 # h
-    gen_hours = 0.0 # h/y
-    gen_fuel = 0.0 # L/y
-
-    # auxilliary counter:
-    shed_duration = 0.0; # duration of current load shedding event (h)
-    Pload_avg = load_energy/(K*dt) # kW
-
-    for k = 1:K
-        # Dispatchable generator : operating hours and fuel consumption
-        Pgen = oper_traj.Pgen[k]
-        Pgen_max = mg.generator.power_rated
-        if Pgen > 0.0 # generator ON
-            Pgen_norm = Pgen / (ε * Pgen_max) # can be Inf e.g. for ε=0.0
-            if Pgen_norm <= 1.0
-                # relaxation of discontinuous generator statistics for small Pgen
-                gen_hours += Pgen_norm * dt
-                fuel_rate = Pgen_norm * mg.generator.fuel_intercept * Pgen_max +
-                            mg.generator.fuel_slope * Pgen # (L/h)
-            else
-                gen_hours += dt
-                fuel_rate = mg.generator.fuel_intercept * Pgen_max +
-                            mg.generator.fuel_slope * Pgen # (L/h)
-            end
-            gen_fuel += fuel_rate * dt
-        end
-
-        # Load shedding: shedding duration and maximum shedding duration
-        Pshed = oper_traj.power_shedding[k]
-        if Pshed > 0.0
-            Pshed_norm = Pshed / (ε * Pload_avg) # can be Inf e.g. for ε=0.0
-            if Pshed_norm <= 1.0
-                # relaxation of discontinuous load statistics for small Pshed
-                shed_hours += Pshed_norm * dt
-                shed_duration += Pshed_norm * dt
-            else
-                shed_hours += dt
-                shed_duration += dt
-            end
-            # keep track of maximum shedding duration:
-            shed_duration_max = max(shed_duration, shed_duration_max)
-        else
-            # reset shedding duration counter:
-            shed_duration = 0.0
-        end
-    end
-
-    # Outputs
-    oper_stats = OperationStats(
-        # Load statistics
-        served_energy, shed_energy, shed_max, shed_hours, shed_duration_max, shed_rate,
-        # Dispatchable generator statistics
-        gen_energy, gen_hours, gen_fuel,
-        # Energy storage (e.g. battery) statistics
-        storage_cycles, storage_char_energy, storage_dis_energy, storage_loss_energy,
-        # Non-dispatchable (typ. renewables) sources statistics
-        spilled_energy, spilled_max, spilled_rate,
-        renew_potential_energy, renew_energy, renew_rate
-    )
-    return oper_stats
 end

@@ -13,16 +13,23 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  90 μs (61 allocations: 71.86 KiB)
+timing of simulate(mg):  106 μs (61 allocations: 71.86 KiB)
 
 detailed timing of simulate(mg):
-- operation: 89   μs (5 allocations: 68.72 KiB)
+- operation: 105  μs (5 allocations: 68.72 KiB)
 - economics: 1.37 μs (56 allocations: 3.14 KiB)
 
-timing of gradient(sim_npc, x): 154 μs (67 allocations: 279.78 KiB)
-which represents 1.7× simulation time (gradient of dim 3).
+timing of gradient(sim_npc, x): 140 μs (67 allocations: 279.78 KiB)
+which represents 1.3× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2023-07-24: Add optional trajectory recorder
+
+For some mysterious reasons, when implementing the optional trajectory recorder
+(but calling with record=false), the simulation time changed (not allocation):
+- performance *decrease* for simulation: 90 → 106 µs (+18%)
+- performance *increase* (!!) for differentiated simulation: 154 → 140 µs
 
 ### 2023-07-24: Combined operation-aggregation
 
