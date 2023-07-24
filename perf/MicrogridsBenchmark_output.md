@@ -1,10 +1,9 @@
-# Run of MicrogridsBenchmark.jl on Dell notebook (i7-1165G7)
-
-**Benchmark results outdated** -> to be run again on Dell i7
+# Run of MicrogridsBenchmark.jl
 
 ## System configuration
 
-Julia version 1.9.2
+- Computer: Dell notebook i7-1165G7
+- Julia version 1.9.2
 
 Results obtained in Ubuntu 22.04, with external power adapter,
 using the “Performance” mode in Gnome Settings/Energy.
@@ -14,17 +13,30 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  153 to 156 μs (185 allocations: 691.45 KiB)
+timing of simulate(mg):  90 μs (61 allocations: 71.86 KiB)
 
 detailed timing of simulate(mg):
-- operation:  126    μs (22 allocations: 684.98 KiB)
-- aggregation: 20.6  μs (19 allocations: 304 bytes)
-- economics:    3.28 μs (144 allocations: 6.17 KiB)
+- operation: 89   μs (5 allocations: 68.72 KiB)
+- economics: 1.37 μs (56 allocations: 3.14 KiB)
 
-timing of gradient(sim_npc, x):  550 μs (207 allocations: 2.69 MiB)
-which represents 3.6× simulation time (gradient of dim 3).
+timing of gradient(sim_npc, x): 154 μs (67 allocations: 279.78 KiB)
+which represents 1.7× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2023-07-24: Combined operation-aggregation
+
+Operation now includes aggregation (like in Microgrids.py) which saves allocating
+several operational time series which are then to be aggregated.
+
+Result:
+- good simulation speed up (155 → 90 µs)
+- much smaller memory allocation (691 → 72 KiB)
+- even better speed up for differentiated simulation (550 → 154 μs)
+
+Remark: there is still one remaining source of vector allocations
+for computing the production of each NonDispatchable source.
+See vectorless-operation branch for the work in progress to remove these last vectors.
 
 ### 2023-07-18: Updgrade Julia 1.8 → 1.9
 

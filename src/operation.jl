@@ -98,10 +98,8 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
     renew_productions = collect(production(nd) for nd in mg.nondispatchables)
     renew_potential = sum(renew_productions)::Vector{Topt}
 
-    # Desired net load
-    Pnl_request = mg.load - renew_potential
-
-    # TODO future version : no need to create renew_potential and Pnl_request arrays
+    # TODO future version: no need to create renew_potential array
+    # (including allocating each production(nd) array)
 
     # Fixed parameters and short aliases
     K = length(mg.load)
@@ -131,14 +129,17 @@ function operation(mg::Microgrid, ε::Real=0.0, recorder=false)
 
     for k=1:K
         ### Decide energy dispatch
+        # Desired net load
+        Pnl_request = mg.load[k] - renew_potential[k]
+
         # Storage energy and power limits
         Psto_emin = - (Esto_max - Esto) / ((1 - sto_loss) * dt)
         Psto_emax = (Esto - Esto_min) / ((1 + sto_loss) * dt)
         Psto_dmax = min(Psto_emax, Psto_pmax)
         Psto_cmax = max(Psto_emin, Psto_pmin)
 
-        # dispatch
-        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_max)
+        # Dispatch
+        Pnl, Pgen, Psto, Pspill, Pshed = dispatch(Pnl_request, Psto_cmax, Psto_dmax, Pgen_max)
 
         # optionally record values in trajectories
         if recorder

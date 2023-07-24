@@ -97,22 +97,18 @@ print("timing of simulate(mg):")
 @btime results = simulate($mg)
 
 function simulate_time(mg)
-    # Run the microgrid operation
+    # Run the microgrid operation (including aggregation)
     print("- operation:")
-    opervarstraj = @btime operation($mg)
-
-    # Aggregate the operation variables
-    print("- aggregation:")
-    opervarsaggr = @btime aggregation($mg, $opervarstraj)
+    oper_stats = @btime operation($mg)
 
     # Eval the microgrid costs
     print("- economics:")
-    costs = @btime economics($mg, $opervarsaggr)
+    costs = @btime economics($mg, $oper_stats)
 
-    return (opervarstraj = opervarstraj, opervarsaggr = opervarsaggr, costs = costs)
+    return (oper_stats = oper_stats, costs = costs)
 end
 
-println("\ndetailed timing of simulate(mg):")
+#println("\ndetailed timing of simulate(mg):")
 simulate_time(mg);
 
 ## Now performance of differentiation ##
