@@ -14,17 +14,23 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  153 to 156 μs (185 allocations: 691.45 KiB)
+timing of simulate(mg):  145 to 146 μs (119 allocations: 688.92 KiB)
 
 detailed timing of simulate(mg):
-- operation:  126    μs (22 allocations: 684.98 KiB)
-- aggregation: 20.6  μs (19 allocations: 304 bytes)
-- economics:    3.28 μs (144 allocations: 6.17 KiB)
+- operation:  120    μs (22 allocations: 684.98 KiB)
+- aggregation: 20.8  μs (19 allocations: 304 bytes)
+- economics:    1.59 μs (78 allocations: 3.64 KiB)
 
-timing of gradient(sim_npc, x):  550 μs (207 allocations: 2.69 MiB)
+timing of gradient(sim_npc, x):  434 μs (125 allocations: 2.68 MiB)
 which represents 3.6× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2023-07-25: small performance increase due to refactor
+
+About 8 µs saved in the refactor since 2023-07-18:
+- operation: 6 µs save due to a one line change?
+- economics: twice as fast
 
 ### 2023-07-18: Updgrade Julia 1.8 → 1.9
 
