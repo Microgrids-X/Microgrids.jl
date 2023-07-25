@@ -3,7 +3,7 @@ module Microgrids
 import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
 export simulate,
-       NonDispatchables,
+       NonDispatchableSource,
        Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
        OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,

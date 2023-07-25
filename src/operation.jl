@@ -82,6 +82,46 @@ struct OperationStats
     renew_rate
 end
 
+const oper_stats_units = Dict(
+    :served_energy => "kWh",
+    :shed_energy => "kWh",
+    :shed_max => "kW",
+    :shed_hours => "h",
+    :shed_duration_max => "h",
+    :shed_rate => "in [0,1]",
+    :gen_energy => "kWh",
+    :gen_hours => "h",
+    :gen_fuel => "L", # TODO: use instead the generator's fuel unit string
+    :storage_cycles => "",
+    :storage_char_energy => "kWh",
+    :storage_dis_energy => "kWh",
+    :storage_loss_energy => "kWh",
+    :spilled_energy => "kWh",
+    :spilled_max => "kW",
+    :spilled_rate => "in [0,1]",
+    :renew_potential_energy => "kWh",
+    :renew_energy => "kWh",
+    :renew_rate => "in [0,1]"
+)
+
+"""
+    Base.show(io::IO, ::MIME"text/plain", stats::OperationStats)
+
+Write a multi-line text representation of `OperationStats` statistics
+"""
+function Base.show(io::IO, ::MIME"text/plain", stats::OperationStats)
+    function format_stat(st::OperationStats, name::Symbol; sigdigits=6)
+        value = getproperty(st, name)
+        return round(value; sigdigits=sigdigits)
+    end
+
+    println(io, "OperationStats with fields:")
+    for name in propertynames(stats)
+        unit = get(oper_stats_units, name, "")
+        println(io, "- ", name, ": ", format_stat(stats, name; sigdigits=5), " ", unit)
+    end
+end
+
 
 """
     operation(mg::Microgrid)
@@ -104,6 +144,7 @@ function operation(mg::Microgrid)
     # Fixed parameters and short aliases
     K = length(mg.load)
     dt = mg.project.timestep
+    Pgen_max = mg.generator.power_rated
     Esto_max = mg.storage.energy_rated
     Esto_min = mg.storage.SoC_min * Esto_max
     Psto_pmax =  mg.storage.discharge_rate * Esto_max
@@ -132,12 +173,10 @@ function operation(mg::Microgrid)
         Psto_cmax[k] = max(Psto_emin, Psto_pmin)
 
         # dispatch
-        Pnl[k], Pgen[k], Psto[k], Pspill[k], Pshed[k] = dispatch(Pnl_request[k], Psto_cmax[k], Psto_dmax[k], mg.generator.power_rated)
+        Pnl[k], Pgen[k], Psto[k], Pspill[k], Pshed[k] = dispatch(Pnl_request[k], Psto_cmax[k], Psto_dmax[k], Pgen_max)
 
         # Storage dynamics
-        if k < K
-            Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
-        end
+        Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
     end
 
     oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen, Esto, Psto, Psto_dmax, Psto_cmax, Pspill)
@@ -209,7 +248,8 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
         # Dispatchable generator : operating hours and fuel consumption
         Pgen = oper_traj.Pgen[k]
         Pgen_max = mg.generator.power_rated
-        if Pgen > 0.0 # generator ON
+        Pgen_eps = Pgen_max*1e-6
+        if Pgen > Pgen_eps # generator ON
             Pgen_norm = Pgen / (ε * Pgen_max) # can be Inf e.g. for ε=0.0
             if Pgen_norm <= 1.0
                 # relaxation of discontinuous generator statistics for small Pgen
