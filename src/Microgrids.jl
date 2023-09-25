@@ -5,6 +5,7 @@ import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 export simulate,
        NonDispatchableSource,
        Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
+       capacity_from_wind,
        OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,
        CostFactors, MicrogridCosts, component_costs, economics

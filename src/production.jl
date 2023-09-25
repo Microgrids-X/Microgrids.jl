@@ -26,26 +26,46 @@ function production(photovoltaic::PVInverter)
 end
 
 """
-    production(wind::WindPower)
+    capacity_from_wind(v::Real; TSP::Real, Cp=0.50, v_out=25.0, α=3.0)
 
-Return the power output of the `wind` source. A quadratic approximation is used
-for the power curve.
+Compute capacity factor (normalized power) of a wind turbine,
+using a generic parametrized power curve P(v), for a given a wind speed `v` (m/s).
 
-!!! note
+Model parameters are:
+- Turbine Specific Power `TSP`, in W/m², typically 200 – 400.
+- Maximum power coefficient `Cp` (used before saturation)
+  should be smaller than Betz' limit of 16/27.
+- Cut-out wind speed is `v_out` (m/s).
 
-    It is defined only for the non-dispatchable sources.
+A fixed Cp model is used, with a soft saturation when reaching maximum power.
+This soft saturation, based on LogSumExp, is tuned with `α`
+(default: 3.0, higher yields sharper transition).
+
+Air is assumed to have fixed density ρ=1.225 kg/m³.
+"""
+function capacity_from_wind(v::Real; TSP::Real, Cp=0.50, v_out=25.0, α=3.0)
+    ρ = 1.225 # kg/m³ at 15°C
+    # Normalized power from the wind, without saturation:
+    cf = 0.5*Cp*ρ/TSP * v^3
+    # saturation using a smooth min based on LogSumExp
+    cf = -log(exp(-α) + exp(-α*cf)) / α
+    # saturate negative values (due to the smooth min)
+    if cf < 0.0
+        cf = 0.0
+    end
+    # Cut-out wind speed:
+    if v > v_out
+        cf = 0.0
+    end
+    return cf
+end
+
+"""
+    production(windpower::WindPower)
+
+Return the power output of the `windpower` source.
 """
 function production(windpower::WindPower)
-    Uhub = windpower.Uanem * log(windpower.zhub/windpower.z0) / log(windpower.zanem/windpower.z0)
-    power_output = zeros(Real,length(windpower.Uanem))   # choisir le type que le ForwardDiff necessite
-    for i=1:length(windpower.Uanem)
-        Pwind_aux = 0
-        if windpower.U_cut_in < Uhub[i] < windpower.U_rated
-            Pwind_aux = windpower.power_rated * ((Uhub[i] - windpower.U_cut_in)/(windpower.U_rated - windpower.U_cut_in))^2  # usando o modelo quadrático
-        elseif windpower.U_rated <= Uhub[i] <= windpower.U_cut_out
-            Pwind_aux = windpower.power_rated
-        end
-        power_output[i] = Pwind_aux
-    end
+    power_output = windpower.power_rated * windpower.capacity_factor
     return power_output
 end

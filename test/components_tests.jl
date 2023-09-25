@@ -217,3 +217,49 @@ end
         @test round(component_costs(pvi, proj0); digits=3) == c
     end
 end
+
+@testset "WindPower" begin
+    # Wind turbine parameters fitted to an EWT 900 kW DW52
+    S_D52 = pi * (52/2)^2 # rotor swept area m²
+    TSP_D52 = 900e3/S_D52 # W/m²
+    v_out = 25.0 # cut-out speed m/s
+    Cp_D52, α_D52 = 0.521, 3.1; # fitted from actual power curve
+
+    wind_speed = [0., 2., 3.,    5.,    7.,    10.,   15., 25., 25.1] # m/s
+    cf_exp =     [0., 0., 0.005, 0.075, 0.227, 0.630, 0.997, 1.0, 0.]
+    cf_wind = capacity_from_wind.(wind_speed; TSP=TSP_D52, Cp=Cp_D52, v_out=v_out, α=α_D52)
+
+    @test cf_wind ≈ cf_exp atol=1e-3
+
+    # Main parameters for WindPower
+    power_rated_wind = 1000. # rated power (kW)
+    investment_price_wind = 3000. # initial investiment price ($/kW)
+    om_price_wind = 60.# operation and maintenance price ($/kW/y)
+    lifetime_wind = 25. # lifetime (y)
+
+    # Parameters which should have default values
+    replacement_price_ratio = 1.0
+    salvage_price_ratio = 1.0
+
+    windgen = WindPower(power_rated_wind, cf_wind,
+        investment_price_wind, om_price_wind, lifetime_wind,
+        replacement_price_ratio, salvage_price_ratio)
+
+    # Wind power production time series
+    @test production(windgen) ≈ cf_exp*power_rated_wind atol=1
+
+    @testset "WindPower: Economics" begin
+        lifetime_mg = 30.
+        proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+
+        c0 = CostFactors(
+            total=5.4e6,
+            investment=3.0e6,
+            replacement=3.0e6,
+            om=60e3*lifetime_mg,
+            fuel=0.0,
+            salvage=-3.0e6*20/25
+        )
+        @test round(component_costs(windgen, proj0); digits=3) == c0
+    end
+end
