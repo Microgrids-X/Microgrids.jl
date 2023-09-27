@@ -1,7 +1,5 @@
 # Run of MicrogridsBenchmark.jl on Dell notebook (i7-1165G7)
 
-**Benchmark results outdated** -> to be run again on Dell i7
-
 ## System configuration
 
 Julia version 1.9.2

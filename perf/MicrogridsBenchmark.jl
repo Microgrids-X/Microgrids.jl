@@ -3,7 +3,7 @@ using BenchmarkTools
 using CSV, DataFrames
 using ForwardDiff
 
-const data = DataFrame(CSV.File("$(@__DIR__)/../examples/microgrid_with_PV_BT_DG/data/Ouessant_data_2016.csv"))
+const data = DataFrame(CSV.File("$(@__DIR__)/../examples/data/Ouessant_data_2016.csv"))
 # Simulation steps
 const nsteps = length(data.Load)
 

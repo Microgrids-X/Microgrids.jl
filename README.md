@@ -44,9 +44,9 @@ The work on the Julia package specifically focuses on:
   (with respect to sizing parameters) can be computed using
   [ForwardDiff](http://www.juliadiff.org/ForwardDiff.jl/).
 
-    - Thanks to our careful treatment of types (and the thanks to ForwardDiff and Julia),
-      computing the gradient with respect to n=3 parameters is performed in less than
-      2×simulation time (whereas finite difference would take n+1=4 × simulation time)
+    - Thanks to our careful treatment of types (and thanks to ForwardDiff and Julia),
+      computing the gradient with respect to n=3 parameters with ForwardDiff should run
+      faster than with finite differences (which take n+1 = 4× simulation time)
 
 ### Documentation
 
