@@ -1,13 +1,18 @@
 # ![Microgrids.jl](https://github.com/Microgrids-X/Microgrids-artwork/raw/main/svg/Microgrids-jl.svg)
 
-The Microgrids.jl package allows simulating the energetic operation of an isolated microgrid,
+The `Microgrids.jl` package allows simulating the energetic operation of an isolated microgrid,
 returning economic and operation indicators.
 
 
 ## Installation and testing
 
-To install this package, follow the [instructions for unregistered packages](http://pkgdocs.julialang.org/v1/managing-packages/#Adding-unregistered-packages).
-The package should be registered soon, allowing installation with `] add Microgrids`.
+To install the latest released version of Microgrids.jl: `] add Microgrids`.
+
+To install the lastest development version, follow the [instructions for unregistered packages](http://pkgdocs.julialang.org/v1/managing-packages/#Adding-unregistered-packages).
+In particular, you can clone this repository and then, from the Julia command line,
+navigate to the folder of your local copy and run:
+- either `] add .` to install from the `main` branch of that local repository, but without tracking file changes
+- or `] dev .` to install from that local repository *with* tracking file changes (see [dev](https://pkgdocs.julialang.org/v1/managing-packages/#developing) install)
 
 The unit tests which ship with the package can be run with `] test Microgrids`.
 
@@ -15,26 +20,28 @@ The unit tests which ship with the package can be run with `] test Microgrids`.
 
 <img alt="Microgrid sizing illustration" src="https://github.com/Microgrids-X/Microgrids-artwork/raw/main/svg/microgrid_sizing.svg" width="250px">
 
-Microgrids.jl can model a microgrid project consisting of:
+`Microgrids.jl` can model a microgrid project consisting of:
 - One load (described by a time series)
 - One dispatchable generator (e.g. Diesel or hydrogen-powered)
 - One energy storage (battery)
-- Any number of non-dispatchable sources, typically renewable like wind or solar power
+- Any number of non-dispatchable sources, typically renewable like wind or solar power,
+  also modeled from on time series
 
 The energy dispatch at each instant of the simulated operation is a simple
 “load following” rule-based control.
 The load is power in priority from the dispatchable sources,
 then the battery, and only using the dispatchable generator as a last recourse.
 
-Microgrids.jl is part of the [Microgrids.X](https://github.com/Microgrids-X/) project
+`Microgrids.jl` is part of the [Microgrids.X](https://github.com/Microgrids-X/) project
 which provides sibling packages in other languages (e.g. in Python)
 to better serve the need of different users (e.g. students).
 
 The work on the Julia package specifically focuses on:
 - **simulation speed** (about 0.2 ms to evaluate one microgrid project,
-  using 1 year of load/solar/wind data at an hourly timestep), way better than pure Python (25 ms for the same task)
+  using 1 year of load/solar/wind data at an hourly timestep), way better than pure Python (11 ms for the same task).
+  See the [perf](perf) folder for simulation performance benchark.
 - **differentiable model**: the exact gradient on the objective function
-  (with respect to sizing parameters) can be computed using 
+  (with respect to sizing parameters) can be computed using
   [ForwardDiff](http://www.juliadiff.org/ForwardDiff.jl/).
 
     - Thanks to our careful treatment of types (and the thanks to ForwardDiff and Julia),
@@ -43,10 +50,12 @@ The work on the Julia package specifically focuses on:
 
 ### Documentation
 
-See the [microgrid_with_PV_BT_DG.ipynb](examples/microgrid_with_PV_BT_DG/microgrid_with_PV_BT_DG.ipynb)
-notebook example which walks through:
-1. the main data structure to describe a Microgrid project
-2. the main function to simulate it and display the results
+Documentation is provided as [Jupyter](https://jupyter.org/) notebooks within the [examples](examples) folder:
+1. Performance simulation in [Microgrid_Wind-Solar.ipynb](examples/Microgrid_Wind-Solar.ipynb):
+   1. Describe a Microgrid project using `Microgrids.jl` data structures
+   2. Simulate its technical and economic performance
+   3. Analyze and display the results
+2. Sizing optimization in [Microgrid_sizing_optimization.ipynb](examples/Microgrid_sizing_optimization.ipynb)
 
 ### Academic work using Microgrids.jl
 
