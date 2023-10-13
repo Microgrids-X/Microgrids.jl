@@ -1,4 +1,5 @@
 # Tests of Microgrids.jl with respect to optimization (e.g. differientation)
+# with optional relaxation of discontinuous statistics
 using ForwardDiff
 
 @testset "Differentiate simulation(mg)" begin
@@ -8,8 +9,11 @@ using ForwardDiff
     Pload = [1., 1., 1.]
     irradiance = [0, 0.5, 1.0]
 
-    """simulate microgrid of size `x` (size=3) and returns its Net Present Cost"""
-    function sim_npc(x)
+    """simulate microgrid of size `x` (size=3) and returns its Net Present Cost
+
+    Optionally smooth discontinuous statistics with relaxation parameter `ε`
+    """
+    function sim_npc(x, ε=0.0)
         power_rated_gen = x[1]
         energy_rated = x[2]
         power_rated_pv = x[3]
@@ -33,15 +37,17 @@ using ForwardDiff
         proj = Project(lifetime, discount_rate, timestep, "€")
         mg = Microgrid(proj, Pload, generator, battery, [photovoltaic])
 
-        results = simulate(mg)
-        return results.costs.npc
+        oper_traj, oper_stats, mg_costs = simulate(mg, ε)
+        return mg_costs.npc
     end
 
     x = [power_rated_gen, energy_rated, power_rated_pv]
 
     # Just a appetizer to check that cost computation works
     npc_expected = 15.023 # M$
+    npc_expected_010 = 15.022 # M$
     @test round(sim_npc(x)/1e6; digits=3) == npc_expected
+    @test round(sim_npc(x, 0.10)/1e6; digits=3) == npc_expected_010
 
     # Centered finite difference approximation of the gradient:
     dx = x*1e-3
@@ -56,10 +62,13 @@ using ForwardDiff
 
     # Test the finite difference approx of the gradient against recorded value
     grad_expected = [282.358, 624.843, 1481.879]
+    grad_expected_010 = [281.879, 624.843, 1481.879] # notice that the gradient change is only with respect to power_rated_gen
     @test round.(grad_approx; digits=3) == grad_expected # $/kW or $/kWh
 
     # Now gradient computation with ForwardDiff:
-    grad_fd = ForwardDiff.gradient(sim_npc, x)
-    @test round.(grad_fd; digits=3) == grad_expected # $/kW or $/kWh
+    grad_ad = ForwardDiff.gradient(sim_npc, x)
+    @test round.(grad_ad; digits=3) == grad_expected # $/kW or $/kWh
+    grad_ad_010 = ForwardDiff.gradient(x -> sim_npc(x, 0.10), x)
+    @test round.(grad_ad_010; digits=3) == grad_expected_010 # $/kW or $/kWh
 
 end

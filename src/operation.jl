@@ -127,7 +127,7 @@ end
     operation(mg::Microgrid)
 
 Simulate the annual operation of the microgrid `mg` and return the
-hourly operation variables `OperVarsTraj`.
+hourly operation variables `OperationTraj`.
 """
 function operation(mg::Microgrid)
     # Type of all variables: Float64 or ForwardDiff.Dual{...}
@@ -186,7 +186,7 @@ end
 """
     aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
 
-Aggregates operation time series `oper_traj` into yearly statistics
+Aggregate operation time series `oper_traj` into yearly statistics
 for the the microgrid `mg` (returned as an `OperationStats` object).
 
 Discontinuous statistics can optionally be relaxed (smoothed)
@@ -194,7 +194,8 @@ using the relaxation parameter `ε`:
 - 0.0 means no relaxation (default value)
 - 1.0 yields the strongest relaxation
 
-when using relaxation, a value between 0.05 and 0.30 is suggested
+Using relaxation (`ε` > 0) is recommended when using gradient-based optimization
+and then a “small enough” value between 0.05 and 0.30 is suggested.
 """
 function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     ### Retrieve parameters
