@@ -3,11 +3,11 @@ module Microgrids
 import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
 export simulate,
-       NonDispatchableSource,
-       Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
+       NonDispatchableSource, ProductionUnit, Tank, TankCompound, 
+       Project, DispatchableCompound,Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
        capacity_from_wind,
-       OperationTraj, OperationStats,
-       operation, aggregation, dispatch, production,
+       OperationTraj, OperationStats, increment,
+       operation, aggregation, dispatch, dispatch2, production, 
        CostFactors, MicrogridCosts, component_costs, economics
 
 include("components.jl")

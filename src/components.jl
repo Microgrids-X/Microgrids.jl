@@ -22,27 +22,27 @@ end
 
 """
 Dispatchable power source
-(e.g. Diesel generator, Gas turbine, Fuel cell)
-
-# About the types of the fields
+(e.g. Diesel generator, Gas turbine, Fuel cell with its associated tank)
 
 All component parameters should be `Float64` except for the
 *sizing parameter(s)* (here `power_rated`)
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct DispatchableGenerator{Topt<:Real}
+
+
+struct ProductionUnit{Topt<:Real}
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
-    "fuel consumption curve intercept (L/h/kW_max)"
-    fuel_intercept::Float64
-    "fuel consumption curve slope (L/h/kW)"
-    fuel_slope::Float64
+    "combustible consumption curve intercept (L/h/kW_max  ) 0for fuel cells and electrolyzer as the models used are linear " 
+    consumption_intercept::Float64
+    "input consumption curve slope (L/h/kW or Kg/h/kW or KW/Kg/h )"
+    consumption_slope::Float64
 
     # Main economics parameters
     "fuel price (\$/L)"
-    fuel_price::Float64
+    combustible_price::Float64
     "initial investiment price (\$/kW)"
     investment_price::Float64
     "operation & maintenance price (\$/kW/h of operation)"
@@ -52,7 +52,7 @@ struct DispatchableGenerator{Topt<:Real}
 
     # Secondary technical parameters (which should have a default value)
     "minimum load ratio ∈ [0,1]"
-    load_ratio_min::Float64
+    minimum_load_ratio::Float64
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
@@ -60,8 +60,59 @@ struct DispatchableGenerator{Topt<:Real}
     "salvage price, relative to initial investment"
     salvage_price_ratio::Float64
     "fuel quantity unit (used in fuel price and consumption curve parameters)"
-    fuel_unit::String
+    input_unit::String
+    output_unit::String
+
 end
+"""
+Description to be added
+
+"""
+
+struct Tank{Topt<:Real}
+    # Main technical parameters
+    "rated capacity (kg or L)"
+    capacity::Topt
+
+    # Main economics parameters
+    "initial investment price (\$/kg or \$/L)"
+    investment_price::Float64
+    "operation and maintenance price (\$/kg/y or \$/L)/y"
+    om_price::Float64
+    "calendar lifetime (y)"
+    lifetime::Float64
+
+    # Secondary technical parameters (which should have a default value)
+    "linear loss factor α (efficiency is about 1 − α) ∈ [0,1]"
+    loss_factor::Float64  # (auto - discharge rate )
+    "initial level of tank ∈ [0,1]"
+    ini_filling_ratio ::Float64
+    "minimum level of tank ∈ [0,1]"
+    min_filling_ratio::Float64
+    "maximum level of tank ∈ [0,1]"
+    max_filling_ratio::Float64
+
+    # Secondary economics parameters (which should have a default value)
+    "replacement price, relative to initial investment"
+    replacement_price_ratio::Float64
+    "salvage price, relative to initial investment"
+    salvage_price_ratio::Float64
+end
+
+
+
+struct DispatchableCompound{Topt<:Real}
+    generator 
+    fuel_cell 
+
+end
+
+struct TankCompound{Topt<:Real}
+    fuelTank 
+    h2Tank 
+
+end
+
 
 
 """
@@ -78,7 +129,8 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Battery{Topt<:Real}
+
+struct Battery{Topt<:Real} 
     # Main technical parameters
     "rated energy capacity (kWh)"
     energy_rated::Topt
@@ -102,6 +154,8 @@ struct Battery{Topt<:Real}
     loss_factor::Float64
     "minimum State of Charge ∈ [0,1]"
     SoC_min::Float64
+    "maximum State of Charge ∈ [0,1]"
+    SoC_max::Float64
     "initial State of Charge ∈ [0,1]"
     SoC_ini::Float64
 
@@ -111,6 +165,7 @@ struct Battery{Topt<:Real}
     "salvage price, relative to initial investment"
     salvage_price_ratio::Float64
 end
+
 
 "Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
 abstract type NonDispatchableSource end
@@ -233,10 +288,18 @@ struct Microgrid{Topt<:Real}
     project::Project
     "desired load time series (kW)"
     load::Vector{Float64}
-    "dispatchable generator"
-    generator::DispatchableGenerator{Topt}
+    " Dispatchable Compound"
+    dispatchables:: DispatchableCompound{Topt}
+    "electrolyzer"
+    electrolyzer
+    "Tanks compound"
+    tanks :: TankCompound{Topt}
     "energy storage (e.g. battery)"
     storage::Battery{Topt}
     "non-dispatchable sources (e.g. renewables like wind and solar)"
-    nondispatchables #::Vector{NonDispatchableSource}
+    nondispatchables
 end
+
+
+
+

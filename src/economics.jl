@@ -120,10 +120,15 @@ also includes `system` cost (all components) and two key economic data:
     system:: CostFactors
     "costs of generator"
     generator:: CostFactors
+   
     "costs of energy storage"
     storage:: CostFactors
     "costs of each non-dispatchable source"
     nondispatchables:: Vector{CostFactors}
+    electrolyzer:: CostFactors
+    fuel_cell:: CostFactors
+    fuel_tank:: CostFactors
+    h2_tank:: CostFactors
 end
 
 ### component_costs methods
@@ -197,23 +202,39 @@ function component_costs(mg_project::Project, lifetime::Real,
 end
 
 """
-    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+    component_costs(gen::ProductionUnit, mg_project::Project, oper_stats::OperationStats)
 
-Compute net present cost factors for a `DispatchableGenerator`.
+Compute net present cost factors for a `ProductionUnit`.
 """
-function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
-    rating = gen.power_rated
-    investment = gen.investment_price * rating
-    replacement = investment * gen.replacement_price_ratio
-    salvage = investment * gen.salvage_price_ratio
-    om_annual = gen.om_price_hours * oper_stats.gen_hours * rating
-    fuel_annual = gen.fuel_price * oper_stats.gen_fuel
+function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_unit_hours, prod_unit_cons)
+    rating = prod_unit.power_rated
+    investment = prod_unit.investment_price * rating
+    replacement = investment * prod_unit.replacement_price_ratio
+    salvage = investment * prod_unit.salvage_price_ratio
+    om_annual = prod_unit.om_price_hours * rating
+    fuel_annual = prod_unit.combustible_price * prod_unit_cons
 
     # effective generator lifetime (in years)
-    lifetime = gen.lifetime_hours / oper_stats.gen_hours
+    lifetime = prod_unit.lifetime_hours / prod_unit_hours
 
     c = component_costs(
         mg_project, lifetime,
+        investment, replacement, salvage,
+        om_annual, fuel_annual
+        )
+    return c
+end
+
+function component_costs(tank::Tank, mg_project::Project)
+    rating = tank.capacity
+    investment = tank.investment_price * rating
+    replacement = investment * tank.replacement_price_ratio
+    salvage = investment * tank.salvage_price_ratio
+    om_annual = tank.om_price * rating
+    fuel_annual = 0.0
+
+    c = component_costs(
+        mg_project, tank.lifetime,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
@@ -324,8 +345,11 @@ See also: [`aggregation`](@ref)
 """
 function economics(mg::Microgrid, oper_stats::OperationStats)
     # Dispatchable generator
-    gen_costs = component_costs(mg.generator, mg.project, oper_stats)
-
+    gen_costs = component_costs(mg.dispatchables.generator[1], mg.project, oper_stats.gen_hours,oper_stats.gen_fuel)
+    elyz_costs = component_costs(mg.electrolyzer[1], mg.project, oper_stats.elyz_hours,oper_stats.elyz_consumed_energy)
+    fc_costs = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.h2_consumed)
+    fuel_tantk_cost = component_costs(mg.tanks.fuelTank, mg.project)
+    h2_tantk_cost = component_costs(mg.tanks.h2Tank, mg.project)
     # Energy storage
     sto_costs = component_costs(mg.storage, mg.project, oper_stats)
 
@@ -342,14 +366,14 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
                         for i = 1:mg.project.lifetime]
     crf = 1/sum(discount_factors)
     # Cost of all components and NPC of the project
-    system_costs = gen_costs + sto_costs + sum(nd_costs)
+    system_costs = gen_costs + sto_costs + sum(nd_costs) + elyz_costs + fc_costs + fuel_tantk_cost + h2_tantk_cost
     npc = system_costs.total
     # levelized cost of energy
     annualized_cost = npc*crf # $/y
     lcoe = annualized_cost / oper_stats.served_energy # ($/y) / (kWh/y) → $/kWh
 
     costs = MicrogridCosts(lcoe, npc,
-        system_costs, gen_costs, sto_costs, nd_costs
+        system_costs, gen_costs, sto_costs, nd_costs, elyz_costs,fc_costs,fuel_tantk_cost,h2_tantk_cost
     )
 
     return costs
