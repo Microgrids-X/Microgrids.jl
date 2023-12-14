@@ -1,4 +1,17 @@
 module Microgrids
+using Documenter
+using DocumenterTools
+using DocStringExtensions
+
+
+@template (TYPES) =
+"""
+$(TYPEDEF)
+$(DOCSTRING)
+
+### Parameters: 
+$(FIELDS)
+"""
 
 import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
