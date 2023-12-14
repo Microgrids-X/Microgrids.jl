@@ -2,12 +2,6 @@
 
 """
 Microgrid project information
-
-Parameters:
-- lifetime (y)
-- discount rate ∈ [0,1]
-- time step (h)
-- currency: "\$", "€"...
 """
 struct Project
     "project lifetime (y)"
@@ -21,27 +15,26 @@ struct Project
 end
 
 """
-Dispatchable power source
-(e.g. Diesel generator, Gas turbine, Fuel cell with its associated tank)
+ProductionUnit
+Unit used to product gaz or energy
+(e.g. Diesel generator, Gas turbine, Fuel cell or Electrolyzer )
 
 All component parameters should be `Float64` except for the
 *sizing parameter(s)* (here `power_rated`)
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-
-
 struct ProductionUnit{Topt<:Real}
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
-    "combustible consumption curve intercept (L/h/kW_max  ) 0for fuel cells and electrolyzer as the models used are linear " 
+    "combustible consumption curve intercept (L/h/kW_max or kg/h/kW_max or kW_max/h/kg ); 0 for fuel cells and electrolyzer as the models used are linear " 
     consumption_intercept::Float64
     "input consumption curve slope (L/h/kW or Kg/h/kW or KW/Kg/h )"
     consumption_slope::Float64
 
     # Main economics parameters
-    "fuel price (\$/L)"
+    "fuel price (\$/L, \$/Kg, \$/kW)"
     combustible_price::Float64
     "initial investiment price (\$/kW)"
     investment_price::Float64
@@ -64,11 +57,16 @@ struct ProductionUnit{Topt<:Real}
     output_unit::String
 
 end
-"""
-Description to be added
 
 """
+Tank( Can be a fuel or a H2 tank)
+# About the types of the fields
 
+All component parameters should be `Float64` except for the
+*sizing parameter(s)* (here `capacity`)
+which type is parametrized as `Topt` and may be also `Float64` or
+or any another `Real` type (e.g. ForwardDiff's dual number type).
+"""
 struct Tank{Topt<:Real}
     # Main technical parameters
     "rated capacity (kg or L)"
@@ -84,7 +82,7 @@ struct Tank{Topt<:Real}
 
     # Secondary technical parameters (which should have a default value)
     "linear loss factor α (efficiency is about 1 − α) ∈ [0,1]"
-    loss_factor::Float64  # (auto - discharge rate )
+    loss_factor::Float64  # 
     "initial level of tank ∈ [0,1]"
     ini_filling_ratio ::Float64
     "minimum level of tank ∈ [0,1]"
@@ -99,21 +97,30 @@ struct Tank{Topt<:Real}
     salvage_price_ratio::Float64
 end
 
-
-
+"""
+Dispatchable compound
+Dispatchable compound brings together the generators and fuel_cells that a `Microgrid` may contain.
+"""
 struct DispatchableCompound{Topt<:Real}
-    generator 
-    fuel_cell 
+    "array of generators"
+    generator :: Vector{ProductionUnit{Topt}}
+    "array of fuel_cells"
+    fuel_cell  :: Vector{ProductionUnit{Topt}}
 
 end
 
+"""
+Tank compound
+Tank compound brings together the both tanks that a `Microgrid` may contain.
+We assumed that a `Microgrid` can only have one `Tank` of each type.
+"""
 struct TankCompound{Topt<:Real}
-    fuelTank 
-    h2Tank 
+    "fuel tank, can be used by all diesel generators of the `Microgrid`"
+    fuelTank :: Tank{Topt}
+    "hydrogen tank, can be used by all diesel generators of the `Microgrid`"
+    h2Tank :: Tank{Topt}
 
 end
-
-
 
 """
 Battery energy storage (including AC/DC converter)
@@ -129,7 +136,6 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-
 struct Battery{Topt<:Real} 
     # Main technical parameters
     "rated energy capacity (kWh)"
@@ -291,7 +297,7 @@ struct Microgrid{Topt<:Real}
     " Dispatchable Compound"
     dispatchables:: DispatchableCompound{Topt}
     "electrolyzer"
-    electrolyzer
+    electrolyzer :: Vector{ProductionUnit{Topt}}
     "Tanks compound"
     tanks :: TankCompound{Topt}
     "energy storage (e.g. battery)"

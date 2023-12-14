@@ -75,7 +75,7 @@ investment_price_hytank = 0.8 # initial investment price  ($/kg)
 om_price_hytank = 0.0025 # operation and maintenance price ($/kg/y)
 lifetime_hytank = 25. # calendar lifetime (y)
 loss_factor_hytank = 0. # hydrogen used on site 
-LoH_ini_ratio = 0.2 # Initial load ratio ∈ [0,1]
+LoH_ini_ratio = 0. # Initial load ratio ∈ [0,1]
 LoH_min_ratio = 0.1 # minimum load ratio ∈ [0,1]
 LoH_max_ratio = 1. # maximum load ratio ∈ [0,1]
 
