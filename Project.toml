@@ -4,7 +4,11 @@ authors = ["Pierre Haessig <pierre.haessig@centralesupelec.fr>", "evelisea <5969
 version = "0.10.2"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 
 [compat]
 julia = "1.6"

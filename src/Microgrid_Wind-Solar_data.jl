@@ -10,16 +10,16 @@ using CSV, DataFrames
 println("Data definition for Microgrid with wind, solar, storage and generator...")
 
 ### Input time series
-data = DataFrame(CSV.File("$(@__DIR__)/data/Ouessant_data_2016.csv"))
+data = DataFrame(CSV.File("C:/Users/nikiemaje/Documents/Macopie/Microgrids.jl/examples/data/Ouessant_data_2016.csv"))
 
 # Simulation steps
-nsteps = 2*length(data.Load)
-@assert(nsteps == 17520) # 1 year at an hourly timestep
+nsteps = length(data.Load)
+@assert(nsteps == 8760) # 1 year at an hourly timestep
 
 # Split load, solar and wind data:
-Pload = [data.Load;data.Load] # kW
-Ppv1k =  [data.Ppv1k; data.Ppv1k]./ 1000; # convert to kW/kWp
-wind_speed = [data.Wind;data.Wind] # m/s
+Pload = data.Load# kW
+Ppv1k =  data.Ppv1k./ 1000; # convert to kW/kWp
+wind_speed = data.Wind # m/s
 
 # Calibrate wind speed data against a mast measurement
 ws_gain = 1.059 # ratio of Mast's mean /PVGIS' mean
@@ -71,11 +71,12 @@ fuel_max_ratio = 1. # maximum load ratio ∈ [0,1]
 
 #H2 Tank
 capacity_rated_hytank = 10000. # rated power capacity (kg)
-investment_price_hytank = 0.8 # initial investment price  ($/kg)
+investment_price_hytank = 500. # initial investment price  ($/kg)
+hy_price = 14. # initial hydrogen price ($/kg)
 om_price_hytank = 0.0025 # operation and maintenance price ($/kg/y)
 lifetime_hytank = 25. # calendar lifetime (y)
 loss_factor_hytank = 0. # hydrogen used on site 
-LoH_ini_ratio = 0. # Initial load ratio ∈ [0,1]
+LoH_ini_ratio = 0.1 # Initial load ratio ∈ [0,1]
 LoH_min_ratio = 0.1 # minimum load ratio ∈ [0,1]
 LoH_max_ratio = 1. # maximum load ratio ∈ [0,1]
 
@@ -104,7 +105,7 @@ charge_rate = 1.0 # max charge power for 1 kWh (kW/kWh = h^-1)
 discharge_rate = 1.0 # max discharge power for 1 kWh (kW/kWh = h^-1)
 loss_factor_sto = 0.05 # linear loss factor α (round-trip efficiency is about 1 − 2α) ∈ [0,1]
 SoC_min = 0. # minimum State of Charge ∈ [0,1]
-SoC_ini = 1. # initial State of Charge ∈ [0,1]
+SoC_ini = 0. # initial State of Charge ∈ [0,1]
 SoC_max = 1. # initial State of Charge ∈ [0,1]
 
 #electrolyzer
@@ -135,3 +136,6 @@ investment_price_wind = 3500. # initial investiment price ($/kW)
 om_price_wind = 100.# operation and maintenance price ($/kW/y)
 lifetime_wind = 25. # lifetime (y)
 
+X=[5000., 3000., 1800., 2000., 1800., 10000.]
+capex_def=[400., 0.0, 1600., 500., 1600., 350., 1200., 3500.]
+ini_filling_state=[0.0,0.0,0.0]

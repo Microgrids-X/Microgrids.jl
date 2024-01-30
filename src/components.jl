@@ -90,6 +90,9 @@ struct Tank{Topt<:Real}
     "maximum level of tank ∈ [0,1]"
     max_filling_ratio::Float64
 
+    "fuel price (\$/L, \$/Kg, \$/kW)"
+    combustible_price::Float64
+    
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
     replacement_price_ratio::Float64
@@ -140,7 +143,6 @@ struct Battery{Topt<:Real}
     # Main technical parameters
     "rated energy capacity (kWh)"
     energy_rated::Topt
-
     # Main economics parameters
     "initial investment price (\$/kWh)"
     investment_price::Float64

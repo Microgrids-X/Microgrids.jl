@@ -225,9 +225,14 @@ function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_un
     return c
 end
 
+"""
+    component_costs(tank::Tank, mg_project::Project)
+
+Compute net present cost factors for a `Tank`.
+"""
 function component_costs(tank::Tank, mg_project::Project)
     rating = tank.capacity
-    investment = tank.investment_price * rating
+    investment = tank.investment_price * rating + (tank.ini_filling_ratio * tank.combustible_price * rating )
     replacement = investment * tank.replacement_price_ratio
     salvage = investment * tank.salvage_price_ratio
     om_annual = tank.om_price * rating
