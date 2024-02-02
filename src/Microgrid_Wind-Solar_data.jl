@@ -10,7 +10,7 @@ using CSV, DataFrames
 println("Data definition for Microgrid with wind, solar, storage and generator...")
 
 ### Input time series
-data = DataFrame(CSV.File("C:/Users/nikiemaje/Documents/Macopie/Microgrids.jl/examples/data/Ouessant_data_2016.csv"))
+data = DataFrame(CSV.File("C:/Users/nikiemaje/Documents/Microgrids.jl/examples/data/Ouessant_data_2016.csv"))
 
 # Simulation steps
 nsteps = length(data.Load)
