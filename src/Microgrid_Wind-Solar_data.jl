@@ -10,7 +10,7 @@ using CSV, DataFrames
 println("Data definition for Microgrid with wind, solar, storage and generator...")
 
 ### Input time series
-data = DataFrame(CSV.File("C:/Users/nikiemaje/Documents/Microgrids.jl/examples/data/Ouessant_data_2016.csv"))
+data = DataFrame(CSV.File("C:/Users/nikiemaje/OneDrive - CentraleSupelec/Documents/Microgrids.jl/examples/data/Ouessant_data_2016.csv"))
 
 # Simulation steps
 nsteps = length(data.Load)
@@ -86,8 +86,8 @@ power_rated_fc = 1800. # rated power capacity (KW)
 cons_intercept_fc=0. #
 cons_rate_fc = 0.0625 # consumption rate (KgH2/KWhé)
 cons_price_fc = 0. #
-investment_price_fc = 1000. # initial investment price  ($/KW)
-om_price_fc = 10. # operation and maintenance price ($/kW/y)
+investment_price_fc = 1600. # initial investment price  ($/KW)
+om_price_fc = 16. # operation and maintenance price ($/kW/y)
 lifetime_fc = 45000. # Fuel Cell lifetime (h)
 load_min_ratio_fc = 0.05 # minimum load ratio ∈ [0,1]
 input_unit_fc= "Kg"
@@ -113,8 +113,8 @@ power_rated_elyz = 2000. # rated power capacity (Kw)
 cons_intercept_elyz= 0. # consumption rate (KWhé/KgH2)
 cons_slope_elyz = 56.  # consumption rate (KWhé/KgH2)
 cons_price_elyz = 0.#
-investment_price_elyz = 1000. # initial investment price  ($/kW)
-om_price_elyz = 10. # operation and maintenance price ($/kW/y)
+investment_price_elyz = 1600. # initial investment price  ($/kW)
+om_price_elyz = 16. # operation and maintenance price ($/kW/y)
 lifetime_elyz = 45000. #Electrolyzer lifetime (h)
 load_min_ratio_elyz = 0.05  # minimum load ratio ∈ [0,1]
 
