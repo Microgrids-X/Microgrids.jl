@@ -25,7 +25,7 @@ The unit tests which ship with the package can be run with `] test Microgrids`.
 - One dispatchable generator (e.g. Diesel or hydrogen-powered)
 - One energy storage (battery)
 - Any number of non-dispatchable sources, typically renewable like wind or solar power,
-  also modeled from on time series
+  also modeled from time series
 
 The energy dispatch at each instant of the simulated operation is a simple
 “load following” rule-based control.
