@@ -180,7 +180,10 @@ function component_costs(mg_project::Project, lifetime::Real,
         # component remaining life at the project end
         remaining_life = lifetime*(1+replacements_number) - mg_lifetime
         # nominal *effective* salvage value (that is given remaining life)
-        salvage_effective = salvage * remaining_life / lifetime
+        #salvage_effective = salvage * remaining_life / lifetime
+        ip1 = 1 + mg_project.discount_rate
+        salvage_effective = salvage * (ip1^lifetime - ip1^remaining_life) /
+                            (ip1^lifetime - 1)
 
     else # Infinite lifetime (happens for components with zero usage)
         replacement_cost = 0.0
