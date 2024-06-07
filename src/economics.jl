@@ -1,5 +1,31 @@
 # Economic modeling of a microgrid project
 
+"""
+    SalvageType
+
+An enum of the type of formula for Salvage value calculation.
+
+Salvage values assigns a negative cost to Microgrid components
+which have a residual lifetime at the end of the project.
+
+## Values
+
+Possible values are:
+- `ZeroSalvage`: no (zero) salvage value
+- `LinearSalvage`: salvage value proportional to residual lifetime
+- `ConsistentSalvage`: salvage value depends nonlinearly in the residual
+  lifetime such that it is economically consistent.
+
+Economic consistency means that, using this nonlinear formula, the NPC computation
+for a given component (investment + replacement(s) - salvage) is consistent
+with the annualized component cost computation (investment*CRF(component lifetime)).
+"""
+@enum SalvageType begin
+    ZeroSalvage
+    LinearSalvage
+    ConsistentSalvage
+end
+
 ### Structures to hold costs
 
 """Net present cost factors of some part of a Microgrid project
@@ -131,7 +157,8 @@ end
 """
     component_costs(mg_project::Project, lifetime::Real,
         investment::Real, replacement::Real, salvage::Real,
-        om_annual::Real, fuel_annual::Real)
+        om_annual::Real, fuel_annual::Real,
+        salvage_type::SalvageType=LinearSalvage)
 
 Compute net present cost factors of a component over the Microgrid lifetime.
 
@@ -146,10 +173,16 @@ Cost evaluation is done from nominal and annual cost factors.
 - salvage: nominal salvage value if component is sold at zero aging
 - om_annual: nominal operation & maintenance (O&M) cost per year
 - fuel_annual: nominal cost of fuel per year
+- salvage_type: choice of formula for salvage value computation, among
+  the possible `SalvageType` enum values:
+  - `ZeroSalvage
+  - `LinearSalvage` (default)
+  - `ConsistentSalvage`
 """
 function component_costs(mg_project::Project, lifetime::Real,
     investment::Real, replacement::Real, salvage::Real,
-    om_annual::Real, fuel_annual::Real)
+    om_annual::Real, fuel_annual::Real,
+    salvage_type::SalvageType=LinearSalvage)
 
     # Microgrid project parameters:
     mg_lifetime = mg_project.lifetime
@@ -179,19 +212,18 @@ function component_costs(mg_project::Project, lifetime::Real,
 
         # compute nominal *effective* salvage value,
         # that is reduced by usage duration
-        salvage_formula = :ConsistentSalvage
-        if salvage_formula == :LinearSalvage
+        if salvage_type == LinearSalvage
             # remaining lifetime of last component at the project end
             remaining_life = lifetime*(1+replacements_number) - mg_lifetime
             # salvage exactly proportional to remaining lifetime
             salvage_effective = salvage * remaining_life / lifetime
-        elseif salvage_formula == :ConsistentSalvage
+        elseif salvage_type == ConsistentSalvage
             dp1 = 1. + mg_project.discount_rate
             # usage duration of the last component at the end of the project
             usage_duration = mg_lifetime - lifetime*replacements_number
             salvage_effective = salvage *
                 (dp1^lifetime - dp1^usage_duration) / (dp1^lifetime - 1)
-        elseif salvage_formula == :ZeroSalvage
+        else # assumes salvage_type == ZeroSalvage
             salvage_effective = 0.0
         end
 
