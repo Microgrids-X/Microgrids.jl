@@ -6,12 +6,11 @@
 An enum of the type of formula for Salvage value calculation.
 
 Salvage values assigns a negative cost to Microgrid components
-which have a residual lifetime at the end of the project.
+which have a *residual lifetime* at the end of the project.
 
 ## Values
 
 Possible values are:
-- `ZeroSalvage`: no (zero) salvage value
 - `LinearSalvage`: salvage value proportional to residual lifetime
 - `ConsistentSalvage`: salvage value depends nonlinearly in the residual
   lifetime such that it is economically consistent.
@@ -19,9 +18,11 @@ Possible values are:
 Economic consistency means that, using this nonlinear formula, the NPC computation
 for a given component (investment + replacement(s) - salvage) is consistent
 with the annualized component cost computation (investment*CRF(component lifetime)).
+
+Remark: zero salvage value can be obtained by setting `salvage_price_ratio=0.0`
+for each Microgrid component.
 """
 @enum SalvageType begin
-    ZeroSalvage
     LinearSalvage
     ConsistentSalvage
 end
@@ -174,10 +175,8 @@ Cost evaluation is done from nominal and annual cost factors.
 - om_annual: nominal operation & maintenance (O&M) cost per year
 - fuel_annual: nominal cost of fuel per year
 - salvage_type: choice of formula for salvage value computation, among
-  the possible `SalvageType` enum values:
-  - `ZeroSalvage
-  - `LinearSalvage` (default)
-  - `ConsistentSalvage`
+  the possible `SalvageType` enum values (`LinearSalvage` the default,
+  or `ConsistentSalvage`, see `SalvageType` documentation)
 """
 function component_costs(mg_project::Project, lifetime::Real,
     investment::Real, replacement::Real, salvage::Real,
@@ -223,8 +222,8 @@ function component_costs(mg_project::Project, lifetime::Real,
             usage_duration = mg_lifetime - lifetime*replacements_number
             salvage_effective = salvage *
                 (dp1^lifetime - dp1^usage_duration) / (dp1^lifetime - 1)
-        else # assumes salvage_type == ZeroSalvage
-            salvage_effective = 0.0
+        else
+            error("salvage_type=$salvage_type not implemented. Use LinearSalvage or ConsistentSalvage instead.")
         end
 
     else # Infinite lifetime (happens for components with zero usage)
@@ -242,11 +241,14 @@ function component_costs(mg_project::Project, lifetime::Real,
 end
 
 """
-    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+    component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats,
+        salvage_type::SalvageType=LinearSalvage)
 
 Compute net present cost factors for a `DispatchableGenerator`.
 """
-function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats)
+function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_stats::OperationStats,
+    salvage_type::SalvageType=LinearSalvage)
+
     rating = gen.power_rated
     investment = gen.investment_price * rating
     replacement = investment * gen.replacement_price_ratio
@@ -260,17 +262,21 @@ function component_costs(gen::DispatchableGenerator, mg_project::Project, oper_s
     c = component_costs(
         mg_project, lifetime,
         investment, replacement, salvage,
-        om_annual, fuel_annual
+        om_annual, fuel_annual,
+        salvage_type
         )
     return c
 end
 
 """
-    component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+    component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats,
+        salvage_type::SalvageType=LinearSalvage)
 
 Compute net present cost factors for a `Battery`.
 """
-function component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats)
+function component_costs(bt::Battery, mg_project::Project, oper_stats::OperationStats,
+    salvage_type::SalvageType=LinearSalvage)
+
     rating = bt.energy_rated
     investment = bt.investment_price * rating
     replacement = investment * bt.replacement_price_ratio
@@ -291,20 +297,24 @@ function component_costs(bt::Battery, mg_project::Project, oper_stats::Operation
     c = component_costs(
         mg_project, lifetime,
         investment, replacement, salvage,
-        om_annual, fuel_annual
+        om_annual, fuel_annual,
+        salvage_type
         )
 
     return c
 end
 
 """
-    component_costs(nd::NonDispatchableSource, mg_project::Project)
+    component_costs(nd::NonDispatchableSource, mg_project::Project,
+        salvage_type::SalvageType=LinearSalvage)
 
 Compute net present cost factors for a `NonDispatchableSource`.
 
 This includes generic Photovoltaic or Wind power sources.
 """
-function component_costs(nd::NonDispatchableSource, mg_project::Project)
+function component_costs(nd::NonDispatchableSource, mg_project::Project,
+    salvage_type::SalvageType=LinearSalvage)
+
     rating = nd.power_rated
     investment = nd.investment_price * rating
     replacement = investment * nd.replacement_price_ratio
@@ -315,17 +325,21 @@ function component_costs(nd::NonDispatchableSource, mg_project::Project)
     c = component_costs(
         mg_project, nd.lifetime,
         investment, replacement, salvage,
-        om_annual, fuel_annual
+        om_annual, fuel_annual,
+        salvage_type
         )
     return c
 end
 
 """
-    component_costs(pv::PVInverter, mg_project::Project)
+    component_costs(pv::PVInverter, mg_project::Project,
+        salvage_type::SalvageType=LinearSalvage)
 
 Compute net present cost factors for a `PVInverter` component.
 """
-function component_costs(pv::PVInverter, mg_project::Project)
+function component_costs(pv::PVInverter, mg_project::Project,
+    salvage_type::SalvageType=LinearSalvage)
+
     # Costs of AC part (~inverter)
     rating = pv.power_rated
     investment = pv.investment_price_ac * rating
@@ -337,7 +351,8 @@ function component_costs(pv::PVInverter, mg_project::Project)
     c_ac = component_costs(
         mg_project, pv.lifetime_ac,
         investment, replacement, salvage,
-        om_annual, fuel_annual
+        om_annual, fuel_annual,
+        salvage_type
         )
 
     # Costs of DC part (~panels)
@@ -350,7 +365,8 @@ function component_costs(pv::PVInverter, mg_project::Project)
     c_dc = component_costs(
         mg_project, pv.lifetime_dc,
         investment, replacement, salvage,
-        om_annual, fuel_annual
+        om_annual, fuel_annual,
+        salvage_type
         )
 
     c = c_ac + c_dc
