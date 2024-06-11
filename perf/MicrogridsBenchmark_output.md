@@ -2,7 +2,7 @@
 
 ## System configuration
 
-Julia version 1.9.2
+Julia version 1.10.4
 
 Results obtained in Ubuntu 22.04, with external power adapter,
 using the “Performance” mode in Gnome Settings/Energy.
@@ -12,17 +12,21 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  145 to 146 μs (119 allocations: 688.92 KiB)
+timing of simulate(mg):  145 to 146 μs (124 allocations: 689.20 KiB)
 
 detailed timing of simulate(mg):
 - operation:  120    μs (22 allocations: 684.98 KiB)
-- aggregation: 20.8  μs (19 allocations: 304 bytes)
-- economics:    1.59 μs (78 allocations: 3.64 KiB)
+- aggregation: 21  μs (19 allocations: 304 bytes)
+- economics:    1.9 μs (81 allocations: 3.72 KiB)
 
-timing of gradient(sim_npc, x):  434 μs (125 allocations: 2.68 MiB)
+timing of gradient(sim_npc, x):  434 μs (128 allocations: 2.68 MiB)
 which represents 3.6× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2024-06-11: small performance decrease due to ConsistentSalvage
+
+3 more allocations in economics, but economics is still < 2µs
 
 ### 2023-07-25: small performance increase due to refactor
 
