@@ -1,11 +1,77 @@
+# Microgrid operation simulation
+
+"""
+    Smoothing(transition::Float64=0.0, gain::Float64=1.0)
+
+Parameters to smooth calculations involving discontinuities (step functions).
+
+Default values which disable smoothing are available as the `NoSmoothing` const.
+
+## Background and purpose
+
+Several computations like operating hours, fuel consumption... involve
+a step function which is discontinuous at zero:
+
+step(x) = 0.0 if x==0.0 and 1.0 if 0 < x ≤ 1.0
+
+This step can be smoothed linearly for 0 ≤ x ≤ `transition`.
+The `transition` parameter should be between:
+- 0.0:no smoothing (default value)
+- 1.0: strongest smoothing (i.e. convex relaxation)
+Smoothing is recommended when using gradient-based optimization
+and then a “small enough” `transition` value between 0.05 and 0.30 is suggested.
+
+Also, because this smoothing underestimates the true step, an optional `gain`≥1,
+can be applied, so that step(x) = gain for x ≥ `transition`.
+"""
+@kwdef struct Smoothing
+    "step transition"
+    transition::Float64 = 0.0
+    "step gain"
+    gain::Float64 = 1.0
+end
+Smoothing(transition::Real=0.0) = Smoothing(transition=transition)
+"no smoothing of discontinuities (step functions)"
+const NoSmoothing = Smoothing(0.0, 1.0)
+
+"""
+    sstep(x::Real, xmax::Real, smoothing::Smoothing=NoSmoothing)
+
+Smoothable step function defined for `x` ∈ [0, `xmax`].
+By default, this is the discontinuous function:
+
+    step(x) = 0.0 if x==0.0
+            = 1.0 if 0 < x ≤ xmax
+
+It can be smoothed by the `smoothing` parameters `transition` and `gain` into
+the piecewise linear continuous function:
+
+    step(x) = x.gain/xthreshold, for x < xthreshold = xmax*transition
+            = gain, for x ≥ xthreshold
+
+(cases x<0 and x>`xmax` are accepted and returns the continuous extension)
+"""
+function  sstep(x::Real, xmax::Real, smoothing::Smoothing=NoSmoothing)
+    ε = smoothing.transition
+    gain = smoothing.gain
+    if x<=0
+        return 0.0
+    else # x>0
+        x_thres = xmax*ε
+        if x < x_thres
+            return x*gain/x_thres
+        else #  x ≥ threshold, incuding the case xmax=0 or transition=0
+            return gain
+        end
+    end
+end
+
 """Operation variables (time series) from a simulated Microgrid operation
 
 (simulation duration is assumed to be 1 year)
 """
 struct OperationTraj{T<:Real}
     # load
-    #= "Net load at each time instant after using the renewables power (kW)"
-    Pnl_req =#
     "Net load at each time instant after dispatch (kW)"
     power_net_load::Vector{T}
     "Unmet load/Load shedding power at each time instant (kW)"
@@ -184,23 +250,21 @@ function operation(mg::Microgrid)
 end
 
 """
-    aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
+    aggregation(mg::Microgrid, oper_traj::OperationTraj, smoothing::Smoothing=NoSmoothing)
 
 Aggregate operation time series `oper_traj` into yearly statistics
 for the the microgrid `mg` (returned as an `OperationStats` object).
 
-Discontinuous statistics can optionally be relaxed (smoothed)
-using the relaxation parameter `ε`:
-- 0.0 means no relaxation (default value)
-- 1.0 yields the strongest relaxation
-
-Using relaxation (`ε` > 0) is recommended when using gradient-based optimization
-and then a “small enough” value between 0.05 and 0.30 is suggested.
+Discontinuous computations can optionally be smoothed (relaxed) using the
+`Smoothing` parameters `transition` and `gain` (see their doc).
+Smoothing is recommended when using gradient-based optimization.
 """
-function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
+function aggregation(mg::Microgrid, oper_traj::OperationTraj, smoothing::Smoothing=NoSmoothing)
     ### Retrieve parameters
     dt = mg.project.timestep
     K = length(mg.load)
+    s_trans = smoothing.transition
+    s_gain = smoothing.gain
 
     ### Compute simple yearly statistics (sum, max...):
     # Load statistics
@@ -251,11 +315,11 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
         Pgen_max = mg.generator.power_rated
         Pgen_eps = Pgen_max*1e-6
         if Pgen > Pgen_eps # generator ON
-            Pgen_norm = Pgen / (ε * Pgen_max) # can be Inf e.g. for ε=0.0
-            if Pgen_norm <= 1.0
+            Pgen_step = sstep(Pgen, Pgen_max, smoothing)
+            if Pgen_step != 1.0
                 # relaxation of discontinuous generator statistics for small Pgen
-                gen_hours += Pgen_norm * dt
-                fuel_rate = Pgen_norm * mg.generator.fuel_intercept * Pgen_max +
+                gen_hours += Pgen_step * dt
+                fuel_rate = Pgen_step * mg.generator.fuel_intercept * Pgen_max +
                             mg.generator.fuel_slope * Pgen # (L/h)
             else
                 gen_hours += dt
@@ -268,11 +332,11 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
         # Load shedding: shedding duration and maximum shedding duration
         Pshed = oper_traj.power_shedding[k]
         if Pshed > 0.0
-            Pshed_norm = Pshed / (ε * Pload_avg) # can be Inf e.g. for ε=0.0
-            if Pshed_norm <= 1.0
+            Pshed_step = sstep(Pshed, Pload_avg, smoothing)
+            if Pshed_step != 1.0
                 # relaxation of discontinuous load statistics for small Pshed
-                shed_hours += Pshed_norm * dt
-                shed_duration += Pshed_norm * dt
+                shed_hours += Pshed_step * dt
+                shed_duration += Pshed_step * dt
             else
                 shed_hours += dt
                 shed_duration += dt

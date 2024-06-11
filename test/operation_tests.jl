@@ -132,12 +132,12 @@
     mg_slow_charge = Microgrid(proj, Pload_1h, gen, batt_slow_charge, [pv])
     mg_slow_discharge = Microgrid(proj, Pload_1h, gen, batt_slow_discharge, [pv])
 
-    "simulate operation statistics, with optional aggregation relaxation"
-    function simulate_stats(mg, ε=0.0)
+    "simulate operation statistics, with optional smoothing of aggregation"
+    function simulate_stats(mg, smoothing=NoSmoothing)
         # Run the microgrid operation
         oper_traj = operation(mg)
         # Aggregate the operation variables
-        oper_stats = aggregation(mg, oper_traj, ε)
+        oper_stats = aggregation(mg, oper_traj, smoothing)
         return oper_stats
     end
     function simulate_Esto(mg)
@@ -315,8 +315,8 @@
         test_properties(simulate_stats(mg_slow_discharge), stats_slow_discharge; title="OperStats", rtol=rtol)
     end
 
-    # Relaxed aggregation
-    @testset "relaxation of some aggregated statistics" begin
+    # Smoothed aggregation
+    @testset "Smoothing of the discontinuous aggregated statistics" begin
         stats_relax_010 = OperationStats(
             # Load statistics: hours 24.0 → 23.28 h, duration max 10.0 → 9.32 h
             79511.7634897933, 4988.236510206714, 477.01053219215305, 23.281128854031188, 9.32435500456943, 0.05903238473617412,
@@ -332,8 +332,21 @@
         stats_relax_050 = OperationStats(
             # Load statistics: hours 24.0 → 16.496 h, duration max 10.0 → 7.59 h
             79511.7634897933, 4988.236510206714, 477.01053219215305, 16.49645098500673, 7.592538201845011, 0.05903238473617412,
-            # Dispatchable generator statistics: hours 48 → 40.83 h, fuel 5448.68 → 5269.44 L
+            # Dispatchable generator statistics: hours 48 → 40.83 h, fuel 5448.68 → 5269.4 L
             17702.87093198049, 40.83038168444497, 5269.448565786442,
+            # Energy storage (e.g. battery) statistics
+            1.9836794636446038, 14497.180620961004, 9306.972942774242, 1190.2076781867618,
+            # Non-dispatchable (typ. renewables) sources statistics
+            17000.89976400046, 928.5714285714286, 0.20239166385714832,
+            84000.0, 66999.10023599953, 0.7773553225963482
+        )
+
+        # And then set smoothing gain to 2.0:
+        stats_relax_050_g2 = OperationStats(
+            # Load statistics: hours 16.496 → 32.99 h, duration max 7.59 → 15.2 h (×2)
+            79511.7634897933, 4988.236510206714, 477.01053219215305, 32.99290197001346, 15.185076403690022, 0.05903238473617412,
+            # Dispatchable generator statistics: hours 40.83 → 81.66 h (×2), fuel 5269.4 → 6290.2 L
+            17702.87093198049, 81.66076336888995, 6290.208107897567,
             # Energy storage (e.g. battery) statistics
             1.9836794636446038, 14497.180620961004, 9306.972942774242, 1190.2076781867618,
             # Non-dispatchable (typ. renewables) sources statistics
@@ -343,8 +356,13 @@
 
         # on that simulation, relaxing with ε=1% has no effect
         # (explanation: relaxed variables are always above 1% of their range)
-        test_properties(simulate_stats(mg_base, 0.01), stats_base; title="OperStats", rtol=rtol)
-        test_properties(simulate_stats(mg_base, 0.10), stats_relax_010; title="OperStats", rtol=rtol)
-        test_properties(simulate_stats(mg_base, 0.50), stats_relax_050; title="OperStats", rtol=rtol)
+        test_properties(simulate_stats(mg_base, Smoothing(transition=0.01)),
+                        stats_base; title="OperStats", rtol=rtol)
+        test_properties(simulate_stats(mg_base, Smoothing(transition=0.10)),
+                        stats_relax_010; title="OperStats", rtol=rtol)
+        test_properties(simulate_stats(mg_base, Smoothing(transition=0.50)),
+                        stats_relax_050; title="OperStats", rtol=rtol)
+        test_properties(simulate_stats(mg_base, Smoothing(transition=0.50, gain=2.0)),
+                        stats_relax_050_g2; title="OperStats", rtol=rtol)
     end
 end

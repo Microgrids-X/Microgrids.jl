@@ -37,7 +37,7 @@ Parameters:
 - currency: "€" (default), "\$"...
 - salvage_type: `LinearSalvage`` or `ConsistentSalvage``
 """
-Base.@kwdef struct Project
+@kwdef struct Project
     "project lifetime (y)"
     lifetime::Int
     "discount rate ∈ [0,1]"

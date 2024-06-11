@@ -8,7 +8,7 @@ export simulate,
        DispatchableGenerator, Battery,
        NonDispatchableSource, Photovoltaic, PVInverter, WindPower,
        capacity_from_wind,
-       OperationTraj, OperationStats,
+       Smoothing, NoSmoothing, OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,
        CostFactors, MicrogridCosts, component_costs, economics
 
@@ -19,29 +19,25 @@ include("operation.jl")
 include("economics.jl")
 
 """
-    simulate(mg::Microgrid, ε::Real=0.0)
+    simulate(mg::Microgrid, smoothing::Smoothing=NoSmoothing)
 
 Simulate the technical and economic performance of a Microgrid `mg`.
 
-Discontinuous computations can optionally be relaxed (smoothed)
-using the relaxation parameter `ε`:
-- 0.0 means no relaxation (default value)
-- 1.0 yields the strongest relaxation
-
-Using relaxation (`ε` > 0) is recommended when using gradient-based optimization
-and then a “small enough” value between 0.05 and 0.30 is suggested.
+Discontinuous computations can optionally be smoothed (relaxed) using the
+`Smoothing` parameters `transition` and `gain` (see their doc).
+Smoothing is recommended when using gradient-based optimization.
 
 Returns:
 - Operational trajectories from `sim_operation` (should be optional in future version)
 - Operational statistics from `sim_operation`
 - Microgrid project costs from `sim_economics`
 """
-function simulate(mg::Microgrid, ε::Real=0.0)
+function simulate(mg::Microgrid, smoothing::Smoothing=NoSmoothing)
     # Run the microgrid operation
     oper_traj = operation(mg)
 
     # Aggregate the operation variables
-    oper_stats = aggregation(mg, oper_traj, ε)
+    oper_stats = aggregation(mg, oper_traj, smoothing)
 
     # Eval the microgrid costs
     mg_costs = economics(mg, oper_stats)
