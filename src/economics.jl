@@ -1,32 +1,5 @@
 # Economic modeling of a microgrid project
 
-"""
-    SalvageType
-
-An enum of the type of formula for Salvage value calculation.
-
-Salvage values assigns a negative cost to Microgrid components
-which have a *residual lifetime* at the end of the project.
-
-## Values
-
-Possible values are:
-- `LinearSalvage`: salvage value proportional to residual lifetime
-- `ConsistentSalvage`: salvage value depends nonlinearly in the residual
-  lifetime such that it is economically consistent.
-
-Economic consistency means that, using this nonlinear formula, the NPC computation
-for a given component (investment + replacement(s) - salvage) is consistent
-with the annualized component cost computation (investment*CRF(component lifetime)).
-
-Remark: zero salvage value can be obtained by setting `salvage_price_ratio=0.0`
-for each Microgrid component.
-"""
-@enum SalvageType begin
-    LinearSalvage
-    ConsistentSalvage
-end
-
 ### Structures to hold costs
 
 """Net present cost factors of some part of a Microgrid project
@@ -211,7 +184,7 @@ function component_costs(mg_project::Project, lifetime::Real,
 
         # compute nominal *effective* salvage value,
         # that is reduced by usage duration
-        if salvage_type == LinearSalvage
+        if salvage_type == LinearSalvage || mg_project.discount_rate == 0.0
             # remaining lifetime of last component at the project end
             remaining_life = lifetime*(1+replacements_number) - mg_lifetime
             # salvage exactly proportional to remaining lifetime
@@ -384,17 +357,18 @@ the aggregated operation statistics `oper_stats`.
 See also: [`aggregation`](@ref)
 """
 function economics(mg::Microgrid, oper_stats::OperationStats)
+    salvage_type = mg.project.salvage_type
     # Dispatchable generator
-    gen_costs = component_costs(mg.generator, mg.project, oper_stats)
+    gen_costs = component_costs(mg.generator, mg.project, oper_stats, salvage_type)
 
     # Energy storage
-    sto_costs = component_costs(mg.storage, mg.project, oper_stats)
+    sto_costs = component_costs(mg.storage, mg.project, oper_stats, salvage_type)
 
     # Non-dispatchable sources (e.g. renewables like wind and solar)
 
     # NonDispatchables costs
     nd_costs = collect(
-        component_costs(mg.nondispatchables[i], mg.project)
+        component_costs(mg.nondispatchables[i], mg.project, salvage_type)
         for i in 1:length(mg.nondispatchables)
         )
 

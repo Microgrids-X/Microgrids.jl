@@ -1,4 +1,31 @@
+# Data types for microgrid project description, in particular each component.
 
+"""
+    SalvageType
+
+An enum of the type of formula for salvage value calculation.
+
+Salvage values assigns a negative cost to Microgrid components
+which have a *residual lifetime* at the end of the project.
+
+## Values
+
+Possible values are:
+- `LinearSalvage`: salvage value proportional to residual lifetime
+- `ConsistentSalvage`: salvage value depends nonlinearly in the residual
+  lifetime such that it is economically consistent.
+
+Economic consistency means that, using this nonlinear formula, the NPC computation
+for a given component (investment + replacement(s) - salvage) is consistent
+with the annualized component cost computation (investment*CRF(component lifetime)).
+
+Remark: zero salvage value can be obtained by setting `salvage_price_ratio=0.0`
+for each Microgrid component.
+"""
+@enum SalvageType begin
+    LinearSalvage
+    ConsistentSalvage
+end
 
 """
 Microgrid project information
@@ -6,19 +33,35 @@ Microgrid project information
 Parameters:
 - lifetime (y)
 - discount rate ∈ [0,1]
-- time step (h)
-- currency: "\$", "€"...
+- time step (h): typically about 1.0 hour
+- currency: "€" (default), "\$"...
+- salvage_type: `LinearSalvage`` or `ConsistentSalvage``
 """
-struct Project
+Base.@kwdef struct Project
     "project lifetime (y)"
     lifetime::Int
     "discount rate ∈ [0,1]"
     discount_rate::Float64
     "time step (h)"
-    timestep::Float64
+    timestep::Float64 = 1.0
     "currency used in price parameters and computed costs"
-    currency::String
+    currency::String = "€"
+    "type of formula for salvage value calculation"
+    salvage_type::SalvageType = LinearSalvage
 end
+# Constructors taking positional arguments with default values and conversion
+Project(lifetime::Real, discount_rate::Real) = Project(
+    ;lifetime=lifetime, discount_rate=discount_rate
+    # default timestep, currency and salvage_type
+)
+Project(lifetime::Real, discount_rate::Real, timestep::Real) = Project(
+    ;lifetime=lifetime, discount_rate=discount_rate, timestep=timestep
+    # default currency and salvage_type
+)
+Project(lifetime::Real, discount_rate::Real, timestep::Real, currency::String) = Project(
+    ;lifetime=lifetime, discount_rate=discount_rate, timestep=timestep, currency=currency
+    # default salvage_type
+)
 
 """
 Dispatchable power source

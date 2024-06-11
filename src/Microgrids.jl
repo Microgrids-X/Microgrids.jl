@@ -3,8 +3,10 @@ module Microgrids
 import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
 export simulate,
-       NonDispatchableSource,
-       Project, DispatchableGenerator, Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
+       SalvageType, LinearSalvage, ConsistentSalvage,
+       Project, Microgrid,
+       DispatchableGenerator, Battery,
+       NonDispatchableSource, Photovoltaic, PVInverter, WindPower,
        capacity_from_wind,
        OperationTraj, OperationStats,
        operation, aggregation, dispatch, production,
@@ -44,7 +46,7 @@ function simulate(mg::Microgrid, ε::Real=0.0)
     # Eval the microgrid costs
     mg_costs = economics(mg, oper_stats)
 
-    return oper_traj, oper_stats, mg_costs
+    return (traj=oper_traj, stats=oper_stats, costs=mg_costs)
 end
 
 end

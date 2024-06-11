@@ -47,7 +47,7 @@
             investment=4000.0,
             replacement=0.0,
             om=0.2*lifetime_mg,
-            fuel=1500*lifetime_mg,
+            fuel=1500.0*lifetime_mg,
             salvage=-3200*14970/15000
         )
         @test round(

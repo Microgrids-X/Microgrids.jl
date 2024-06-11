@@ -79,11 +79,15 @@ end
         replacement_price_ratio, salvage_price_ratio)
 
     # Microgrid, with and without a 5% discount rate:
-    proj0 = Project(lifetime, 0.0, timestep, "€")
-    proj5 = Project(lifetime, discount_rate, timestep, "€")
+    proj0 = Project(lifetime, 0.0, timestep, "€") # LinearSalvage default
+    proj5 = Project(lifetime, discount_rate, timestep, "€") # LinearSalvage default
+    proj0_cs = Project(lifetime, 0.0, timestep, "€", ConsistentSalvage)
+    proj5_cs = Project(lifetime, discount_rate, timestep, "€", ConsistentSalvage)
 
-    mg0 = Microgrid(proj0, Pload, generator, battery, [photovoltaic]);
-    mg5 = Microgrid(proj5, Pload, generator, battery, [photovoltaic]);
+    mg0 = Microgrid(proj0, Pload, generator, battery, [photovoltaic])
+    mg5 = Microgrid(proj5, Pload, generator, battery, [photovoltaic])
+    mg0_cs = Microgrid(proj0_cs, Pload, generator, battery, [photovoltaic]);
+    mg5_cs = Microgrid(proj5_cs, Pload, generator, battery, [photovoltaic]);
 
     # Bypass of the operation simulation + aggregation:
     served_energy = 6.774979e6
@@ -106,10 +110,14 @@ end
 
     costs0 = economics(mg0, oper_stats)
     costs5 = economics(mg5, oper_stats)
+    costs0_cs = economics(mg0_cs, oper_stats)
+    costs5_cs = economics(mg5_cs, oper_stats)
 
     # NPC validations
     @test round(costs0.npc/1e6; digits=3) == 41.697 # M$, without discount
     @test round(costs5.npc/1e6; digits=3) == 28.353 # M$, with 5% discount
+    @test round(costs0_cs.npc/1e6; digits=3) == 41.697 # same as with LinearSalvage
+    @test round(costs5_cs.npc/1e6; digits=3) == 28.282 # slightly smaller than with LinearSalvage
     # LCOE
     @test round(costs0.lcoe; digits=3) == 0.246 # $/kWh, without discount
     @test round(costs5.lcoe; digits=3) == 0.297 # $/kWh, with 5% discount
@@ -130,6 +138,15 @@ end
         fuel=9.455,
         salvage=-0.336
     )
+    sys_c5M_cs = CostFactors( # same as with LinearSalvage except for Salvage
+        total=28.282,
+        investment=11.07,
+        replacement=3.516,
+        om=4.648,
+        fuel=9.455,
+        salvage=-0.408 # slightly larger in absolute value
+    )
     @test round(costs0.system/1e6; digits=3) == sys_c0M # M$, without discount
     @test round(costs5.system/1e6; digits=3) == sys_c5M # M$, with 5% discount
+    @test round(costs5_cs.system/1e6; digits=3) == sys_c5M_cs # M$, with 5% discount and ConsistentSalvage
 end
