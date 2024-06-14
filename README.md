@@ -18,7 +18,7 @@ The unit tests which ship with the package can be run with `] test Microgrids`.
 
 ## Description of Microgrids.jl
 
-<img alt="Microgrid sizing illustration" src="'examples/images/microgrid_h2.png'" width="250px">
+<img alt="Microgrid sizing illustration" src='examples/images/microgrid_h2.png' width="250px">
 
 `Microgrids.jl` can model a microgrid project consisting of:
 - One load (described by a time series)
