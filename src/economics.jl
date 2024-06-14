@@ -23,6 +23,7 @@ Cost factors are expressed as Net Present Values, meaning they represent
     fuel
     "salvage cost (negative)"
     salvage
+
 end
 
 # Arithmetic for CostFactors: +,*,/ and round
@@ -101,6 +102,19 @@ function Base.round(c::CostFactors, r=RoundNearest;
     return cr
 end
 
+@kwdef struct MicrogridCashflow
+
+    gen :: Vector{Float64}
+    fuel_tank :: Vector{Float64}
+    batt :: Vector{Float64}
+    fc :: Vector{Float64}
+    elyz :: Vector{Float64}
+    h2_tank :: Vector{Float64}
+    pv :: Vector{Float64}
+    wind :: Vector{Float64}
+    
+
+end
 
 """Cost factors of each component of a Microgrid
 
@@ -129,7 +143,9 @@ also includes `system` cost (all components) and two key economic data:
     fuel_cell:: CostFactors
     fuel_tank:: CostFactors
     h2_tank:: CostFactors
+    cashflow :: MicrogridCashflow
 end
+
 
 ### component_costs methods
 
@@ -162,6 +178,13 @@ function component_costs(mg_project::Project, lifetime::Real,
     discount_factors = [ 1/((1 + mg_project.discount_rate)^i) for i=1:mg_lifetime ]
     sum_discounts = sum(discount_factors)
 
+    cashflow=zeros(Real,mg_lifetime+1)
+
+    cashflow[1]= investment
+    for i=2:mg_lifetime
+        cashflow[i]= om_annual 
+    end 
+
     ### Operation & maintenance and fuel costs
     om_cost = om_annual * sum_discounts
     fuel_cost = fuel_annual * sum_discounts
@@ -180,12 +203,26 @@ function component_costs(mg_project::Project, lifetime::Real,
             # discount factors for the replacements years
             replacement_factors = [1/(1 + mg_project.discount_rate)^i for i in replacement_years]
             replacement_cost = replacement * sum(replacement_factors)
+            for i=1:replacements_number
+                cashflow[1+i*(ceil(Integer,lifetime)-1)]+= replacement
+            end 
         end
 
-        # component remaining life at the project end
-        remaining_life = lifetime*(1+replacements_number) - mg_lifetime
-        # nominal *effective* salvage value (that is given remaining life)
-        salvage_effective = salvage * remaining_life / lifetime
+        salvage_formula = :LinearSalvage
+        if salvage_formula == :LinearSalvage
+            # remaining lifetime of last component at the project end
+            remaining_life = lifetime*(1+replacements_number) - mg_lifetime
+            # salvage exactly proportional to remaining lifetime
+            salvage_effective = salvage * remaining_life / lifetime
+        elseif salvage_formula == :ConsistentSalvage
+            dp1 = 1. + mg_project.discount_rate
+            # usage duration of the last component at the end of the project
+            usage_duration = mg_lifetime - lifetime*replacements_number
+            salvage_effective = salvage *
+                (dp1^lifetime - dp1^usage_duration) / (dp1^lifetime - 1)
+        elseif salvage_formula == :ZeroSalvage
+            salvage_effective = 0.0
+        end
 
     else # Infinite lifetime (happens for components with zero usage)
         replacement_cost = 0.0
@@ -195,34 +232,41 @@ function component_costs(mg_project::Project, lifetime::Real,
     # net present salvage cost (<0)
     salvage_cost = -salvage_effective * discount_factors[mg_lifetime]
 
+    cashflow[mg_lifetime+1] = -1*salvage_effective
+
     ### Total
     total_cost = investment + replacement_cost + om_cost + fuel_cost + salvage_cost
+    cashflow*=-1
+    
 
-    return CostFactors(total_cost, investment, replacement_cost, om_cost, fuel_cost, salvage_cost)
+    return CostFactors(total_cost, investment, replacement_cost, om_cost, fuel_cost, salvage_cost),cashflow
 end
-
 """
     component_costs(gen::ProductionUnit, mg_project::Project, oper_stats::OperationStats)
 
 Compute net present cost factors for a `ProductionUnit`.
 """
-function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_unit_hours, prod_unit_cons)
+function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_unit_hours, prod_unit_starts,prod_unit_cons)
     rating = prod_unit.power_rated
     investment = prod_unit.investment_price * rating
     replacement = investment * prod_unit.replacement_price_ratio
     salvage = investment * prod_unit.salvage_price_ratio
-    om_annual = prod_unit.om_price_hours * rating
+    om_annual = prod_unit.om_price_hourly * rating * prod_unit_hours + prod_unit.om_price*rating
     fuel_annual = prod_unit.combustible_price * prod_unit_cons
 
-    # effective generator lifetime (in years)
-    lifetime = prod_unit.lifetime_hours / prod_unit_hours
+    # effective production unit  lifetime (in years)
+    if prod_unit_hours > 0.0 || prod_unit_hours >0.0
+    lifetime = min(prod_unit.lifetime_hours / prod_unit_hours,prod_unit.lifetime_on_off / prod_unit_starts, prod_unit.lifetime_calendar)
+    else
+    lifetime = prod_unit.lifetime_calendar
+    end
 
-    c = component_costs(
+    c,cashflow = component_costs(
         mg_project, lifetime,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
-    return c
+    return c,cashflow
 end
 
 """
@@ -238,12 +282,12 @@ function component_costs(tank::Tank, mg_project::Project)
     om_annual = tank.om_price * rating
     fuel_annual = 0.0
 
-    c = component_costs(
+    c, cashflow = component_costs(
         mg_project, tank.lifetime,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
-    return c
+    return c,cashflow
 end
 
 """
@@ -269,13 +313,13 @@ function component_costs(bt::Battery, mg_project::Project, oper_stats::Operation
         lifetime = bt.lifetime_calendar
     end
 
-    c = component_costs(
+    c,cashflow = component_costs(
         mg_project, lifetime,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
 
-    return c
+    return c,cashflow
 end
 
 """
@@ -293,12 +337,12 @@ function component_costs(nd::NonDispatchableSource, mg_project::Project)
     om_annual = nd.om_price * rating
     fuel_annual = 0.0
 
-    c = component_costs(
+    c,cashflow = component_costs(
         mg_project, nd.lifetime,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
-    return c
+    return c,cashflow
 end
 
 """
@@ -315,7 +359,7 @@ function component_costs(pv::PVInverter, mg_project::Project)
     om_annual = pv.om_price_ac * rating
     fuel_annual = 0.0
 
-    c_ac = component_costs(
+    c_ac,cashflow_ac = component_costs(
         mg_project, pv.lifetime_ac,
         investment, replacement, salvage,
         om_annual, fuel_annual
@@ -328,14 +372,15 @@ function component_costs(pv::PVInverter, mg_project::Project)
     salvage = investment * pv.salvage_price_ratio
     om_annual = pv.om_price_dc * rating
 
-    c_dc = component_costs(
+    c_dc,cashflow_dc = component_costs(
         mg_project, pv.lifetime_dc,
         investment, replacement, salvage,
         om_annual, fuel_annual
         )
 
     c = c_ac + c_dc
-    return c
+    cashflow=cashflow_ac.+cashflow_dc
+    return c, cashflow
 end
 
 ### Economic evaluation of an entire microgrid project
@@ -350,35 +395,40 @@ See also: [`aggregation`](@ref)
 """
 function economics(mg::Microgrid, oper_stats::OperationStats)
     # Dispatchable generator
-    gen_costs = component_costs(mg.dispatchables.generator[1], mg.project, oper_stats.gen_hours,oper_stats.gen_fuel)
-    elyz_costs = component_costs(mg.electrolyzer[1], mg.project, oper_stats.elyz_hours,oper_stats.elyz_consumed_energy)
-    fc_costs = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.h2_consumed)
-    fuel_tantk_cost = component_costs(mg.tanks.fuelTank, mg.project)
-    h2_tantk_cost = component_costs(mg.tanks.h2Tank, mg.project)
+    gen_costs, gen_cashflow = component_costs(mg.dispatchables.generator[1], mg.project, oper_stats.gen_hours,oper_stats.gen_starts,oper_stats.gen_fuel)
+    elyz_costs, elyz_cashflow = component_costs(mg.electrolyzer[1], mg.project, oper_stats.elyz_hours,oper_stats.elyz_starts,oper_stats.elyz_consumed_energy)
+    fc_costs,fc_cashflow = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.fc_starts,oper_stats.h2_consumed)
+    fuel_tank_cost,fuel_tank_cashflow = component_costs(mg.tanks.fuelTank, mg.project)
+    h2_tank_cost ,h2_tank_cashflow = component_costs(mg.tanks.h2Tank, mg.project)
     # Energy storage
-    sto_costs = component_costs(mg.storage, mg.project, oper_stats)
+    sto_costs, sto_cashflow = component_costs(mg.storage, mg.project, oper_stats)
 
     # Non-dispatchable sources (e.g. renewables like wind and solar)
 
     # NonDispatchables costs
-    nd_costs = collect(
+    nd_tots= collect(
         component_costs(mg.nondispatchables[i], mg.project)
         for i in 1:length(mg.nondispatchables)
         )
 
+   
+    pv_cashflow= nd_tots[1][2]
+    wind_cashflow=nd_tots[2][2]
+    nd_costs=[nd_tots[1][1],nd_tots[2][1]]
     # Capital recovery factor (CRF)
     discount_factors = [1/((1 + mg.project.discount_rate)^i)
                         for i = 1:mg.project.lifetime]
     crf = 1/sum(discount_factors)
     # Cost of all components and NPC of the project
-    system_costs = gen_costs + sto_costs + sum(nd_costs) + elyz_costs + fc_costs + fuel_tantk_cost + h2_tantk_cost
+    system_costs = gen_costs + sto_costs + sum(nd_costs) + elyz_costs + fc_costs + fuel_tank_cost + h2_tank_cost
     npc = system_costs.total
+    
     # levelized cost of energy
     annualized_cost = npc*crf # $/y
     lcoe = annualized_cost / oper_stats.served_energy # ($/y) / (kWh/y) → $/kWh
 
     costs = MicrogridCosts(lcoe, npc,
-        system_costs, gen_costs, sto_costs, nd_costs, elyz_costs,fc_costs,fuel_tantk_cost,h2_tantk_cost
+        system_costs, gen_costs, sto_costs, nd_costs, elyz_costs,fc_costs,fuel_tank_cost,h2_tank_cost,MicrogridCashflow(gen_cashflow,fuel_tank_cashflow,sto_cashflow,fc_cashflow,elyz_cashflow,h2_tank_cashflow,pv_cashflow,wind_cashflow)
     )
 
     return costs

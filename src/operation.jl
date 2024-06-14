@@ -35,6 +35,7 @@ struct OperationTraj{T<:Real}
     # renewables sources
     "Renewables curtailment power at each time instant (kW)"
     power_curtailment::Vector{T}
+    Pdump::Vector{T}
 end
 
 """Aggregated statistics over the simulated Microgrid operation
@@ -62,24 +63,79 @@ struct OperationStats
     gen_energy
     "cumulated operating hours of the dispatchable generator (h/y)"
     gen_hours
+    "cumulated starts on of the dispatchable generator "
+    gen_starts
     "fuel consumption (L/y)"
     gen_fuel
+    "running time at nominal power"
+    gen_rt_at_nom
+    "minimum running power"
+    gen_min_rp
+    "average running power"
+    gen_avg_rp
+    "average running time by per start"
+    gen_avg_rt
+    "maximum running time per start"
+    gen_max_rt
+    "minimum running time per start"
+    gen_min_rt
+    "number of runs that last 2h or less"
+    gen_ru2
+    "number of runs that last more than 2h"
+    gen_ro2 
 
     # Hydrogen chain statistics
     "energy supplied by the fuel cell (kWh/y)"
     fc_energy
     "cumulated operating hours of the fuel_cell (h/y)"
     fc_hours
+    "number of starts"
+    fc_starts
     "total amount of consumed hydrogen"
     h2_consumed
+    "running time at nominal power"
+    fc_rt_at_nom
+    "minimum running power"
+    fc_min_rp
+    "average running power"
+    fc_avg_rp
+    "average running time per start"
+    fc_avg_rt
+    "maximum running time per start"
+    fc_max_rt
+    "minimum running time per start"
+    fc_min_rt
+    "number of runs that last 2h or less"
+    fc_ru2
+    "number of runs that last more than 2h"
+    fc_ro2
     "total amount of produced hydrogen"
     h2_produced
     "cumulated operating hours of the electrolyzer (h/y)"
     elyz_hours
+    "number of starts"
+    elyz_starts
     "energy consumed by the the electrolyzer to produce hydrogen (kWh/y)"
     elyz_consumed_energy
+    "running time at nominal power"
+    elyz_rt_at_nom
+    "minimum running power"
+    elyz_min_rp
+    "average running power"
+    elyz_avg_rp
+    "average running time per start"
+    elyz_avg_rt
+    "maximum running time per start"
+    elyz_max_rt
+    "minimum running time per start"
+    elyz_min_rt
+    "number of runs that last 2h or less"
+    elyz_ru2
+    "number of runs that last more than 2h"
+    elyz_ro2
     "energy lossed in the Power-Gaz-Power chain (kWh/y)"
     h2_chain_loss
+
 
     # Energy storage (e.g. battery) statistics
     "cycling of the energy storage (cycles/y)"
@@ -99,6 +155,8 @@ struct OperationStats
     "ratio of spilled energy to the energy potentially supplied by renewables (∈ [0,1])"
     spilled_rate
     "energy potentially supplied by renewables in the absence spillage (kWh/y)"
+    dumped_energy
+    dump_max
     renew_potential_energy
     "energy actually supplied by renewables when substracting spillage (kWh/y)"
     renew_energy
@@ -115,13 +173,40 @@ const oper_stats_units = Dict(
     :shed_rate => "in [0,1]",
     :gen_energy => "kWh",
     :gen_hours => "h",
+    :gen_starts => "",
     :gen_fuel => "L",# TODO: use instead the generator's fuel unit string
+    :gen_rt_at_nom =>"h",
+    :gen_min_rp =>"KW",
+    :gen_avg_rp => "kW",
+    :gen_avg_rt => "h",
+    :gen_max_rt =>"h",
+    :gen_min_rt =>"h",
+    :gen_ru2 =>"",
+    :gen_ro2 =>"",
     :fc_energy => "kWh",
     :fc_hours => "h",
+    :fc_starts => "",
     :h2_consumed => "kg",
+    :fc_rt_at_nom =>"h",
+    :fc_min_rp =>"KW",
+    :fc_avg_rp => "kW",
+    :fc_avg_rt => "h",
+    :fc_max_rt =>"h",
+    :fc_min_rt =>"h",
+    :fc_ru2 =>"",
+    :fc_ro2 =>"",
     :h2_produced => "kg",
     :elyz_hours => "h",
+    :elyz_starts => "",
     :elyz_consumed_energy => "kWh",
+    :elyz_rt_at_nom =>"h",
+    :elyz_min_rp =>"KW",
+    :elyz_avg_rp => "kW",
+    :elyz_avg_rt => "h",
+    :elyz_max_rt =>"h",
+    :elyz_min_rt =>"h",
+    :elyz_ru2 =>"",
+    :elyz_ro2 =>"",
     :h2_chain_loss => "kWh",
     :storage_cycles => "",
     :storage_char_energy => "kWh",
@@ -130,6 +215,8 @@ const oper_stats_units = Dict(
     :spilled_energy => "kWh",
     :spilled_max => "kW",
     :spilled_rate => "in [0,1]",
+    :dump_energy => "kWh",
+    :dump_max => "kW",
     :renew_potential_energy => "kWh",
     :renew_energy => "kWh",
     :renew_rate => "in [0,1]"
@@ -153,37 +240,58 @@ function Base.show(io::IO, ::MIME"text/plain", stats::OperationStats)
     end
 end
 
-"""
-    increment(prod_unit_power::Float64, prod_unit::ProductionUnit,  ε::Real=0.0)
 
-Allow to compute operating hours and fuel consumption of 'ProductionUnit'.
 """
-function increment(prod_unit_power::Float64, prod_unit::ProductionUnit,  ε::Real=0.0)
+    usage(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Int64,n_starts::Int64)
+
+Allow to operate running statistics of production units
+"""
+function usage(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
     Pprod_unit_max = prod_unit.power_rated
     Pprod_unit_eps = Pprod_unit_max*1e-6
     prod_unit_intercept = prod_unit.consumption_intercept
     prod_unit_slope = prod_unit.consumption_slope
     time_inc = 0
     cons_rate = 0
-        if prod_unit_power > Pprod_unit_eps # prod_unit ON
-            Pprod_unit_norm = prod_unit_power / (ε * Pprod_unit_max) # can be Inf e.g. for ε=0.0
-           
-            if Pprod_unit_norm <= 1.0
-                time_inc = Pprod_unit_norm # relaxation of discontinuous generator statistics for small Pgen
-                cons_rate = Pprod_unit_norm * prod_unit_intercept * Pprod_unit_max +
-                prod_unit_slope * prod_unit_power # (L/h)
-            else
-                time_inc=1
-                cons_rate = prod_unit_intercept * Pprod_unit_max +
-                prod_unit_slope * prod_unit_power # (L/h)
-            end
-          
+    if prod_unit_power > Pprod_unit_eps # prod_unit ON
+        Pprod_unit_norm = prod_unit_power / (ε * Pprod_unit_max) # can be Inf e.g. for ε=0.0
+        if Pprod_unit_norm <= 1.0
+            time_inc = 1 # relaxation of discontinuous prod_unit statistics for small Prod_unit_power
+            cons_rate = Pprod_unit_norm * prod_unit_intercept * Pprod_unit_max +
+            prod_unit_slope * prod_unit_power # (L/h)
+        else
+            time_inc=1
+            cons_rate = prod_unit_intercept * Pprod_unit_max +
+            prod_unit_slope * prod_unit_power # (L/h)
         end
-    return time_inc , cons_rate
-
-
+        if cr == 0.0
+            n_starts+=1
+        end
+        if prod_unit_power == Pprod_unit_max
+            c1+=1*dt
+        end
+        if prod_unit_power < minP
+            minP=prod_unit_power
+        end
+        cr+=dt
+    else
+        if cr>max_rt
+            max_rt=cr
+        end
+        if cr<min_rt && cr>0.0
+            min_rt=cr
+        end
+        if cr<2*dt && cr>0.0
+            r_u_2+=1
+        elseif cr>=2*dt && cr>0.0
+            r_o_2+=1
+        end
+        cr=0
+    end
+    hours+=time_inc*dt
+    cons+=cons_rate*dt
+    return n_starts,minP,c1,max_rt,min_rt,r_u_2,r_o_2,cr,hours,cons
 end
-
 """
     operation(mg::Microgrid, dispatch::Function)
 
@@ -246,6 +354,7 @@ function operation(mg::Microgrid, dispatch::Function)
 
     Pspill = zeros(Topt,K)
     Pshed = zeros(Topt,K)
+    Pdump = zeros(Topt,K)
 
     Pelyz = zeros(Topt,K, n_elyz)
     Pelyz_emax = zeros(Topt, n_elyz) 
@@ -292,7 +401,7 @@ function operation(mg::Microgrid, dispatch::Function)
         Pgen_dmax .=  min.(Pgen_emax,Pgen_max)
 
         # dispatch
-        Pnl[k], Pgen[k,1], Psto[k], Pspill[k], Pshed[k], Pelyz[k,1], Pfc[k,1] = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_min[1], Pgen_dmax[1],  Pelyz_min[1],Pelyz_cmax[1], Pfc_min[1],Pfc_pmax[1])
+        Pnl[k], Pgen[k,1], Psto[k], Pspill[k], Pshed[k], Pdump[k], Pelyz[k,1], Pfc[k,1] = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_min[1], Pgen_dmax[1],  Pelyz_min[1],Pelyz_cmax[1], Pfc_min[1],Pfc_pmax[1])
 
         # Battery storage dynamics
         Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
@@ -311,7 +420,7 @@ function operation(mg::Microgrid, dispatch::Function)
 
     end
 
-    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen[:,1], Pfc[:,1], Pelyz[:,1], Esto, Psto, LoH, LoF, Pspill)
+    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen[:,1], Pfc[:,1], Pelyz[:,1], Esto, Psto, LoH, LoF, Pspill,Pdump)
     
     return oper_traj
 end
@@ -371,6 +480,8 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     # Non-dispatchable (typ. renewables) sources statistics
     spilled_energy = sum(oper_traj.power_curtailment) * dt # kWh/y
     spilled_max = maximum(oper_traj.power_curtailment) # kW
+    dumped_energy = sum(oper_traj.Pdump)*dt  # kWh/y
+    dumped_max = maximum(oper_traj.Pdump)# kW
     renew_potential_energy = sum(oper_traj.Prenew_pot) * dt # kWh/y
     spilled_rate = spilled_energy / renew_potential_energy
     renew_energy = renew_potential_energy - spilled_energy
@@ -382,31 +493,53 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     shed_hours = 0.0 # h/y
     shed_duration_max = 0.0 # h
     gen_hours = 0.0 # h/y
+    gen_starts = 0 # 
     gen_fuel = 0.0 # L/y
+    gen_rt_at_nom = 0.0;
+    gen_min_rp= mg.dispatchables.generator[1].power_rated;
+    gen_avg_rp= 0.0;
+    gen_avg_rt=0.0;
+    gen_max_rt=0.0;
+    gen_min_rt=K*dt
+    gen_ru2=0;
+    gen_ro2=0;
     elyz_hours = 0.0
+    elyz_starts=0
+    elyz_cons=0.0;
+    elyz_rt_at_nom=0.0;
+    elyz_min_rp=mg.electrolyzer[1].power_rated;
+    elyz_avg_rp=0.0;
+    elyz_avg_rt=0.0;
+    elyz_max_rt=0.0;
+    elyz_min_rt=K*dt
+    elyz_ru2=0;
+    elyz_ro2=0;
     fc_hours = 0.0
-   
+    fc_starts=0
+    fc_cons=0.0;
+    fc_rt_at_nom=0.0;
+    fc_min_rp=mg.dispatchables.fuel_cell[1].power_rated;
+    fc_avg_rp=0.0;
+    fc_avg_rt=0.0;
+    fc_max_rt=0.0;
+    fc_min_rt=K*dt;
+    fc_ru2=0;
+    fc_ro2=0;
 
     # auxilliary counter:
     shed_duration = 0.0; # duration of current load shedding event (h)
     Pload_avg = load_energy/(K*dt) # kW
+    cr=zeros(Float64,3)
+    for k = 1:K
+        gen_starts,gen_min_rp,gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_hours,gen_fuel=usage(oper_traj.Pgen[k],mg.dispatchables.generator[1],gen_hours,gen_fuel,gen_min_rp,dt,
+                                                                                                                     gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_starts)
 
-    for K = 1:K
-        # Dispatchable generator : operating hours and fuel consumption
-        time_inc, cons_rate = increment(oper_traj.Pgen[K],mg.dispatchables.generator[1],ε) 
-         gen_hours += time_inc * dt
-         gen_fuel += cons_rate * dt
-
-         # Electrolyzer : operating hours 
-        time_inc, cons_rate = increment(oper_traj.Pelyz[K],mg.electrolyzer[1],ε)
-        elyz_hours += time_inc * dt
-        
-         # Fuel cell : operating hours 
-        time_inc, cons_rate = increment(oper_traj.Pfc[K],mg.dispatchables.fuel_cell[1],ε)
-        fc_hours += time_inc * dt
-       
+        fc_starts,fc_min_rp,fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_hours,fc_cons=usage(oper_traj.Pfc[k],mg.dispatchables.fuel_cell[1],fc_hours,fc_cons,fc_min_rp,dt,
+                                                                                                                    fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_starts)
+        elyz_starts,elyz_min_rp,elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_hours,elyz_cons=usage(oper_traj.Pelyz[k],mg.electrolyzer[1],elyz_hours,elyz_cons,elyz_min_rp,dt,
+                                                                                                                    elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_starts)
         # Load shedding: shedding duration and maximum shedding duration
-        Pshed = oper_traj.power_shedding[K]
+        Pshed = oper_traj.power_shedding[k]
         if Pshed > 0.0
             Pshed_norm = Pshed / (ε * Pload_avg) # can be Inf e.g. for ε=0.0
             if Pshed_norm <= 1.0
@@ -425,19 +558,28 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
         end
     end
 
+    gen_avg_rp= sum(oper_traj.Pgen)/gen_hours;
+    gen_avg_rt=gen_hours/gen_starts;
+    fc_avg_rp= sum(oper_traj.Pfc)/fc_hours;
+    fc_avg_rt=fc_hours/fc_starts;
+    elyz_avg_rp= sum(oper_traj.Pelyz)/elyz_hours;
+    elyz_avg_rt=elyz_hours/elyz_starts;
+
     # Outputs
     oper_stats = OperationStats(
         # Load statistics
         served_energy, shed_energy, shed_max, shed_hours, shed_duration_max, shed_rate,
         # Dispatchable generator statistics
-        gen_energy, gen_hours, gen_fuel, 
+        gen_energy, gen_hours, gen_starts,gen_fuel,gen_rt_at_nom,gen_min_rp,gen_avg_rp,gen_avg_rt,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2, 
         #H2 chain statistics
-        fc_produced_energy, fc_hours, fc_consumed_h2, elyz_produced_h2, elyz_hours, elyz_consumed_energy, chain_loss,
+        fc_produced_energy, fc_hours,fc_starts, fc_consumed_h2,fc_rt_at_nom,fc_min_rp,fc_avg_rp,fc_avg_rt,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,
+        elyz_produced_h2, elyz_hours,elyz_starts, elyz_consumed_energy,elyz_rt_at_nom,elyz_min_rp,elyz_avg_rp,elyz_avg_rt,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,
+        chain_loss,
 
         # Energy storage (e.g. battery) statistics
         storage_cycles, storage_char_energy, storage_dis_energy, storage_loss_energy,
         # Non-dispatchable (typ. renewables) sources statistics
-        spilled_energy, spilled_max, spilled_rate,
+        spilled_energy, spilled_max, spilled_rate,dumped_energy,dumped_max,
         renew_potential_energy, renew_energy, renew_rate
     )
     return oper_stats

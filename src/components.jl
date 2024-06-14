@@ -23,6 +23,7 @@ All component parameters should be `Float64` except for the
 *sizing parameter(s)* (here `power_rated`)
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
+Please only one O&M price should be use . Choose before a size based price (om_price) or an hourly based one om_price_hours)
 """
 struct ProductionUnit{Topt<:Real}
     # Main technical parameters
@@ -39,9 +40,15 @@ struct ProductionUnit{Topt<:Real}
     "initial investiment price (\$/kW)"
     investment_price::Float64
     "operation & maintenance price (\$/kW/h of operation)"
-    om_price_hours::Float64
+    om_price_hourly::Float64
+    "operation & maintenance price (\$/kW of operation)"
+    om_price::Float64
+    "generator calendar lifetime "
+    lifetime_calendar::Float64
     "generator lifetime (h of operation)"
     lifetime_hours::Float64
+    "prod unit  maximum starts"
+    lifetime_on_off :: Float64
 
     # Secondary technical parameters (which should have a default value)
     "minimum load ratio ∈ [0,1]"
@@ -120,7 +127,7 @@ We assumed that a `Microgrid` can only have one `Tank` of each type.
 struct TankCompound{Topt<:Real}
     "fuel tank, can be used by all diesel generators of the `Microgrid`"
     fuelTank :: Tank{Topt}
-    "hydrogen tank, can be used by all diesel generators of the `Microgrid`"
+    "hydrogen tank, can be used by all Electrolyzers generators of the `Microgrid`"
     h2Tank :: Tank{Topt}
 
 end

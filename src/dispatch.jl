@@ -78,30 +78,47 @@ function dispatch_1(Pnl_req,
     Pshed = 0.0
     Pelyz = 0.0
     Pfc = 0.0
+    Pdump = 0.0
     
     if Pnl_req >= 0.0
         ## Pnl_req >= 0 - load excess - after evaluating the production (Pnl = Pload - VRE generation)
         # battery discharging --> Pbatt positive
-        Pbatt = min(Pbatt_dmax,Pnl_req)
 
-        if Pnl_req - Pbatt > Pfc_min
-            # fuel_cell starts on if the battery can't supply the power net load request
-            Pfc = min(Pfc_max,Pnl_req-Pbatt)
+        if Pnl_req > Pbatt_dmax && Pfc_max >= Pfc_min
+            if Pnl_req - Pbatt_dmax >= Pfc_min
+                Pbatt =  Pbatt_dmax
+                Pfc = min(Pfc_max,Pnl_req-Pbatt)
+                Pshed = Pnl_req - Pbatt - Pfc - Pgen 
+            else 
+                Pfc=Pfc_min
+                if Pnl_req>=Pfc
+                    Pbatt= Pnl_req-Pfc
+                    Pshed = 0.0
+                else
+                    
+               Pbatt = max(Pnl_req-Pfc,Pbatt_cmax)
+                Pdump = Pnl_req-Pfc-Pbatt
+                end
+            end
+        else
+            Pbatt=min(Pnl_req,Pbatt_dmax)
+            Pshed = Pnl_req - Pbatt - Pfc - Pgen 
         end
-        
-        if Pnl_req - Pbatt - Pfc > Pgen_min
+
+    """    if Pnl_req - Pbatt - Pfc > Pgen_min
             # Diesel generator starts on if the battery & the fuel_cell can't supply the power net load request
             Pgen = min(Pgen_max,Pnl_req-Pbatt-Pfc)
         end
-
-        Pshed = Pnl_req - Pbatt - Pfc - Pgen
+        """
+ 
+    
 
     ## Pnl_req < 0 - VRE excess
     elseif Pnl_req < 0.0
         # battery charging --> Pbatt negative
         Pbatt = max(Pbatt_cmax,Pnl_req)
        
-        if Pbatt - Pnl_req > Pelyz_min
+        if Pbatt - Pnl_req > Pelyz_min && Pelyz_max > Pelyz_min
             #Electrolyzer starts on if its remain enough power    
             Pelyz = min(Pelyz_max,Pbatt-Pnl_req)
         end
@@ -111,7 +128,7 @@ function dispatch_1(Pnl_req,
 
     Pnl = Pnl_req - Pshed + Pspill
 
-    return Pnl, Pgen , Pbatt, Pspill, Pshed, Pelyz, Pfc
+    return Pnl, Pgen , Pbatt, Pspill, Pshed,Pdump, Pelyz, Pfc
 end
 
 """
@@ -142,29 +159,41 @@ function dispatch_2(Pnl_req,
     Pshed = 0.0
     Pelyz = 0.0
     Pfc = 0.0
+    Pdump = 0.0
+
     # Pnl_req >= 0 - load excess - after evaluating the production (Pnl = Pload - VRE generation)
     if Pnl_req >= 0.0
-        # fuel_cell starts on if possible . the battery can't supply the power net load request
-        if Pnl_req > Pfc_min
-            Pfc = min(Pfc_max, Pnl_req)
-        end
+        if Pfc_max >= Pfc_min
+            if Pnl_req >= Pfc_min
+                Pfc=min(Pfc_max,Pnl_req)
+                Pbatt=min(Pnl_req-Pfc,Pbatt_dmax)
+            else 
+                if Pbatt_dmax < Pnl_req
+                    Pfc=Pfc_min
+                    Pbatt=max(Pnl_req-Pfc,Pbatt_cmax)
+                    Pdump = Pnl_req-Pfc-Pbatt
+                else
+                    Pbatt = Pnl_req
+                end
 
-        # Battery starts on if the fuel cell can't supply the power net load request
-        Pbatt = min(Pbatt_dmax, Pnl_req - Pfc)
-   
-        if Pnl_req - Pbatt - Pfc > Pgen_min         
+            end
+        else
+            Pbatt=min(Pnl_req,Pbatt_dmax)
+        end
+        
+"""
+        if Pnl_req - Pbatt - Pfc > Pgen_min
             # Diesel generator starts on if the battery & the fuel_cell can't supply the power net load request
-            Pgen = min(Pgen_max, Pnl_req - Pbatt - Pfc)
+            Pgen = min(Pgen_max,Pnl_req-Pbatt-Pfc)
         end
-
-        Pshed = Pnl_req - Pbatt - Pfc - Pgen
-
+"""
+        Pshed = Pnl_req - Pbatt - Pfc - Pgen - Pdump
     # Pnl_req < 0 - VRE excess
     elseif Pnl_req < 0.0
 
-        if -1 * Pnl_req > Pelyz_min
+        if -1 * Pnl_req > Pelyz_min && Pelyz_max >= Pelyz_min
             #Electrolyzer starts on  
-            Pelyz=min(Pelyz_max, - Pnl_req)
+            Pelyz=min(Pelyz_max, -1* Pnl_req)
             
         end
 
@@ -176,5 +205,5 @@ function dispatch_2(Pnl_req,
 
     Pnl = Pnl_req - Pshed + Pspill
 
-    return Pnl, Pgen , Pbatt, Pspill, Pshed, Pelyz, Pfc
+    return Pnl, Pgen , Pbatt, Pspill, Pshed, Pdump,Pelyz, Pfc
 end
