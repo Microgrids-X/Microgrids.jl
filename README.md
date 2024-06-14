@@ -18,11 +18,13 @@ The unit tests which ship with the package can be run with `] test Microgrids`.
 
 ## Description of Microgrids.jl
 
-<img alt="Microgrid sizing illustration" src="https://github.com/Microgrids-X/Microgrids-artwork/raw/main/svg/microgrid_sizing.svg" width="250px">
+<img alt="Microgrid sizing illustration" src="'examples/images/microgrid_h2.png'" width="250px">
 
 `Microgrids.jl` can model a microgrid project consisting of:
 - One load (described by a time series)
-- One dispatchable generator (e.g. Diesel or hydrogen-powered)
+- One dispatchable diesel generator 
+- One fuel cell
+- One Electrolyzer
 - One energy storage (battery)
 - Any number of non-dispatchable sources, typically renewable like wind or solar power,
   also modeled from on time series
@@ -37,7 +39,7 @@ which provides sibling packages in other languages (e.g. in Python)
 to better serve the need of different users (e.g. students).
 
 The work on the Julia package specifically focuses on:
-- **simulation speed** (about 0.2 ms to evaluate one microgrid project,
+- **simulation speed** (about 0.5 ms to evaluate one microgrid project,
   using 1 year of load/solar/wind data at an hourly timestep), way better than pure Python (11 ms for the same task).
   See the [perf](perf) folder for simulation performance benchark.
 - **differentiable model**: the exact gradient on the objective function
