@@ -23,6 +23,23 @@
 
     @test gen.power_rated == power_rated_gen
 
+    @testset "DispatchableGenerator: Constructors" begin # with default values
+        gen_defaults = DispatchableGenerator(power_rated_gen,
+            fuel_intercept, fuel_slope, fuel_price,
+            investment_price_gen, om_price_gen, lifetime_gen,
+            0.,
+            1.0, 1.0, "L")
+        gen1 = DispatchableGenerator(power_rated_gen,
+            fuel_intercept, fuel_slope, fuel_price,
+            investment_price_gen, om_price_gen, lifetime_gen)
+        gen2 = DispatchableGenerator(power_rated_gen,
+            fuel_intercept, fuel_slope, fuel_price,
+            investment_price_gen, om_price_gen, lifetime_gen,
+            0.0) # with load_ratio_min
+        @test gen1 == gen_defaults
+        @test gen2 == gen_defaults
+    end
+
     @testset "DispatchableGenerator: Economics" begin
         lifetime_mg = 30.
         proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
@@ -57,12 +74,7 @@
     end
 end
 
-
-@testset "Economics: Battery" begin
-    lifetime_mg = 25 # just a bit more than the battery
-    proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
-    proj5 = Project(lifetime_mg, 0.05, 1., "€") # 5% discount
-
+@testset "Battery" begin
     # Main parameters for Battery
     energy_rated = 7.0 # (kWh)
     investment_price = 100.0 # ($/kWh)
@@ -84,6 +96,17 @@ end
         charge_rate, discharge_rate, loss_factor, SoC_min, SoC_ini,
         replacement_price_ratio, salvage_price_ratio)
 
+    @testset "Battery: Constructors" begin # with default values
+        batt_defaults = Battery(energy_rated,
+            investment_price, om_price, lifetime_calendar, lifetime_cycles,
+            1.0, 1.0, 0.05, 0.0, 0.0,
+            1.0, 1.0)
+        batt1 = Battery(energy_rated,
+            investment_price, om_price, lifetime_calendar, lifetime_cycles)
+
+        @test batt1 == batt_defaults
+    end
+
     # Fake operation statistics for cycling:
     oper_stats(storage_cycles) = OperationStats(
         0., 0., 0., 0., 0., 0.,
@@ -94,36 +117,42 @@ end
     aggr100C = oper_stats(100.0) # not enough cycles to reduce the lifetime
     aggr300C = oper_stats(300.0) # lifetime reduced to 3000/300 = 10 yr
 
-    # Costs with no discount, with increasing amount of cycling
-    c_0C = CostFactors( # cost with no to little cycling (calendar lifetime dominant)
-        total=2660.0,
-        investment=700.0,
-        replacement=700.0*0.9, # 630.0
-        om=70.0*25, # 1750.0
-        fuel=0.0,
-        salvage=-420.0
-    )
-    c_300C = CostFactors( # cost with lifetime dominated by cycling
-        total=3430.0,
-        investment=700.0,
-        replacement=700.0*0.9*2, # 1260.0
-        om=70.0*25, # 1750.0
-        fuel=0.0,
-        salvage=-280.0
-    )
-    @test component_costs(batt, proj0, aggr0C)   == c_0C
-    @test component_costs(batt, proj0, aggr100C) == c_0C # 100 c/y is like 0
-    @test component_costs(batt, proj0, aggr300C) == c_300C
-    # Costs *with* discount
-    c5_0C = CostFactors(
-        total=1799.99,
-        investment=700.0,
-        replacement=237.44,
-        om=986.58,
-        fuel=0.0,
-        salvage=-124.03
-    )
-    @test round(component_costs(batt, proj5, aggr0C); digits=2) == c5_0C
+    @testset "Battery: Economics" begin
+        lifetime_mg = 25 # just a bit more than the battery
+        proj0 = Project(lifetime_mg, 0.00, 1., "€") # no discount
+        proj5 = Project(lifetime_mg, 0.05, 1., "€") # 5% discount
+
+        # Costs with no discount, with increasing amount of cycling
+        c_0C = CostFactors( # cost with no to little cycling (calendar lifetime dominant)
+            total=2660.0,
+            investment=700.0,
+            replacement=700.0*0.9, # 630.0
+            om=70.0*25, # 1750.0
+            fuel=0.0,
+            salvage=-420.0
+        )
+        c_300C = CostFactors( # cost with lifetime dominated by cycling
+            total=3430.0,
+            investment=700.0,
+            replacement=700.0*0.9*2, # 1260.0
+            om=70.0*25, # 1750.0
+            fuel=0.0,
+            salvage=-280.0
+        )
+        @test component_costs(batt, proj0, aggr0C)   == c_0C
+        @test component_costs(batt, proj0, aggr100C) == c_0C # 100 c/y is like 0
+        @test component_costs(batt, proj0, aggr300C) == c_300C
+        # Costs *with* discount
+        c5_0C = CostFactors(
+            total=1799.99,
+            investment=700.0,
+            replacement=237.44,
+            om=986.58,
+            fuel=0.0,
+            salvage=-124.03
+        )
+        @test round(component_costs(batt, proj5, aggr0C); digits=2) == c5_0C
+    end
 end
 
 
@@ -147,6 +176,21 @@ end
     @test pv.power_rated == power_rated_pv
     @test pv.lifetime == lifetime_pv
     @test production(pv) == [0.00, 0.45, 0.90] * power_rated_pv
+
+    @testset "Photovoltaic: Constructors" begin # with default values
+        pv_defaults = Photovoltaic(power_rated_pv, irradiance,
+            investment_price_pv, om_price_pv,
+            lifetime_pv, 0.9,
+            1.0, 1.0)
+        pv1 = Photovoltaic(power_rated_pv, irradiance,
+            investment_price_pv, om_price_pv,
+            lifetime_pv, 0.9) # with derating_factor_pv
+        pv2 = Photovoltaic(power_rated_pv, irradiance,
+            investment_price_pv, om_price_pv,
+            lifetime_pv)
+        @test pv1 == pv_defaults
+        @test pv2 == pv_defaults
+    end
 
     @testset "Photovoltaic: Economics" begin
         lifetime_mg = 30.
@@ -247,6 +291,15 @@ end
 
     # Wind power production time series
     @test production(windgen) ≈ cf_exp*power_rated_wind atol=1
+
+    @testset "WindPower: Constructors" begin # with default values
+        wg_defaults = WindPower(power_rated_wind, cf_wind,
+            investment_price_wind, om_price_wind, lifetime_wind,
+            1.0, 1.0)
+        wg1 = WindPower(power_rated_wind, cf_wind,
+            investment_price_wind, om_price_wind, lifetime_wind)
+        @test wg1 == wg_defaults
+    end
 
     @testset "WindPower: Economics" begin
         lifetime_mg = 30.

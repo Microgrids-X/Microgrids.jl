@@ -37,8 +37,8 @@ Parameters:
 - currency: "€" (default), "\$"...
 - salvage_type: `LinearSalvage`` or `ConsistentSalvage``
 """
-@kwdef struct Project
-    "project lifetime (y)"
+@kwdef mutable struct Project
+    "project lifetime, i.e. economic study period (y)"
     lifetime::Int
     "discount rate ∈ [0,1]"
     discount_rate::Float64
@@ -74,7 +74,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct DispatchableGenerator{Topt<:Real}
+@kwdef mutable struct DispatchableGenerator{Topt<:Real}
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -95,17 +95,37 @@ struct DispatchableGenerator{Topt<:Real}
 
     # Secondary technical parameters (which should have a default value)
     "minimum load ratio ∈ [0,1]"
-    load_ratio_min::Float64
+    load_ratio_min::Float64 = 0.0
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
-    replacement_price_ratio::Float64
+    replacement_price_ratio::Float64 = 1.0
     "salvage price, relative to initial investment"
-    salvage_price_ratio::Float64
+    salvage_price_ratio::Float64 = 1.0
     "fuel quantity unit (used in fuel price and consumption curve parameters)"
-    fuel_unit::String
+    fuel_unit::String = "L"
 end
+# Constructors taking positional arguments with default values and conversion
+DispatchableGenerator(
+    power_rated::Topt, fuel_intercept::Real, fuel_slope::Real, fuel_price::Real,
+    investment_price::Real, om_price_hours::Real, lifetime_hours::Real
+    ) where {Topt<:Real} = DispatchableGenerator(;
+    power_rated, fuel_intercept, fuel_slope, fuel_price,
+    investment_price, om_price_hours, lifetime_hours
+)
+# same but with load_ratio_min as extra argument
+DispatchableGenerator(
+    power_rated::Topt, fuel_intercept::Real, fuel_slope::Real, fuel_price::Real,
+    investment_price::Real, om_price_hours::Real, lifetime_hours::Real,
+    load_ratio_min::Real) where {Topt<:Real} = DispatchableGenerator(;
+    power_rated, fuel_intercept, fuel_slope, fuel_price,
+    investment_price, om_price_hours, lifetime_hours, load_ratio_min
+)
 
+"test equality between two components" # needed for *mutable* struct
+Base.:(==)(c1::DispatchableGenerator, c2::DispatchableGenerator) = all(
+    getfield(c1, field) == getfield(c2, field)
+    for field in fieldnames(DispatchableGenerator))
 
 """
 Battery energy storage (including AC/DC converter)
@@ -121,7 +141,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Battery{Topt<:Real}
+@kwdef mutable struct Battery{Topt<:Real}
     # Main technical parameters
     "rated energy capacity (kWh)"
     energy_rated::Topt
@@ -138,25 +158,41 @@ struct Battery{Topt<:Real}
 
     # Secondary technical parameters (which should have a default value)
     "max charge power for 1 kWh (kW/kWh = h^-1)"
-    charge_rate::Float64 # should be type Topt in a more advanced battery model
+    charge_rate::Float64 = 1.0 # should be type Topt in a more advanced battery model
     "max discharge power for 1 kWh (kW/kWh = h^-1)"
-    discharge_rate::Float64 # should be type Topt in a more advanced battery model
+    discharge_rate::Float64 = 1.0 # should be type Topt in a more advanced battery model
     "linear loss factor α (round-trip efficiency is about 1 − 2α) ∈ [0,1]"
-    loss_factor::Float64
+    loss_factor::Float64 = 0.05
     "minimum State of Charge ∈ [0,1]"
-    SoC_min::Float64
+    SoC_min::Float64 = 0.0
     "initial State of Charge ∈ [0,1]"
-    SoC_ini::Float64
+    SoC_ini::Float64 = 0.0
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
-    replacement_price_ratio::Float64
+    replacement_price_ratio::Float64 = 1.0
     "salvage price, relative to initial investment"
-    salvage_price_ratio::Float64
+    salvage_price_ratio::Float64 = 1.0
 end
+# Constructor taking positional arguments with default values and conversion
+Battery(energy_rated::Topt, investment_price::Real, om_price::Real,
+    lifetime_calendar::Real, lifetime_cycles::Real
+    ) where {Topt<:Real} = Battery(;
+    energy_rated, investment_price, om_price, lifetime_calendar, lifetime_cycles
+)
+
+"test equality between two components" # needed for *mutable* struct
+Base.:(==)(c1::Battery, c2::Battery) = all(
+    getfield(c1, field) == getfield(c2, field)
+    for field in fieldnames(Battery))
 
 "Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
 abstract type NonDispatchableSource end
+
+"test equality between two components" # needed for *mutable* struct
+Base.:(==)(c1::Source, c2::Source) where {Source <: NonDispatchableSource} = all(
+    getfield(c1, field) == getfield(c2, field)
+    for field in fieldnames(Source))
 
 """Solar photovoltaic generator (including AC/DC converter)
 
@@ -170,7 +206,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
+@kwdef mutable struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -187,14 +223,28 @@ struct Photovoltaic{Topt<:Real} <: NonDispatchableSource
 
     # Secondary technical parameters (which should have a default value)
     "derating factor (or performance ratio) ∈ [0,1]"
-    derating_factor::Float64
+    derating_factor::Float64 = 0.9
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
-    replacement_price_ratio::Float64
+    replacement_price_ratio::Float64 = 1.0
     "salvage price, relative to initial investment"
-    salvage_price_ratio::Float64
+    salvage_price_ratio::Float64 = 1.0
 end
+# Constructors taking positional arguments with default values and conversion
+Photovoltaic(power_rated::Topt, irradiance::Vector{Float64},
+    investment_price::Real, om_price::Real, lifetime::Real
+    ) where {Topt<:Real} =  Photovoltaic(;
+    power_rated, irradiance,
+    investment_price, om_price, lifetime
+)
+# same, with derating_factor as extra argument
+Photovoltaic(power_rated::Topt, irradiance::Vector{Float64},
+    investment_price::Real, om_price::Real, lifetime::Real, derating_factor::Real
+    ) where {Topt<:Real} =  Photovoltaic(;
+    power_rated, irradiance,
+    investment_price, om_price, lifetime, derating_factor
+)
 
 """Solar photovoltaic generator with adjustable AC/DC converter
 
@@ -208,7 +258,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-struct PVInverter{Topt<:Real} <: NonDispatchableSource
+@kwdef mutable struct PVInverter{Topt<:Real} <: NonDispatchableSource
     # Main technical parameters
     "rated AC (inverter) power (kW)"
     power_rated::Topt
@@ -235,20 +285,20 @@ struct PVInverter{Topt<:Real} <: NonDispatchableSource
 
     # Secondary technical parameters (which should have a default value)
     "derating factor (or performance ratio) ∈ [0,1]"
-    derating_factor::Float64
+    derating_factor::Float64 = 0.9
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
-    replacement_price_ratio::Float64
+    replacement_price_ratio::Float64 = 1.0
     "salvage price, relative to initial investment"
-    salvage_price_ratio::Float64
+    salvage_price_ratio::Float64 = 1.0
 end
 
 """Wind power generator (simple model using a given capacity factor time series)
 
 See `capacity_from_wind` to compute capacity factor time series from wind speed.
 """
-struct WindPower{Topt<:Real} <: NonDispatchableSource
+@kwdef mutable struct WindPower{Topt<:Real} <: NonDispatchableSource
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -265,13 +315,20 @@ struct WindPower{Topt<:Real} <: NonDispatchableSource
 
     # Secondary economics parameters (which should have a default value)
     "replacement price, relative to initial investment"
-    replacement_price_ratio::Float64
+    replacement_price_ratio::Float64 = 1.0
     "salvage price, relative to initial investment"
-    salvage_price_ratio::Float64
+    salvage_price_ratio::Float64 = 1.0
 end
+# Constructor taking positional arguments with default values and conversion
+WindPower(power_rated::Topt, capacity_factor::Vector{Float64},
+    investment_price::Real, om_price::Real, lifetime::Real
+    ) where {Topt<:Real} = WindPower(;
+    power_rated, capacity_factor,
+    investment_price, om_price, lifetime
+)
 
 """Microgrid system description"""
-struct Microgrid{Topt<:Real}
+@kwdef mutable struct Microgrid{Topt<:Real}
     "microgrid project information"
     project::Project
     "desired load time series (kW)"
