@@ -1,5 +1,19 @@
 # Tests for Microgrid operation simulation, in particular operation statistics
 
+@testset "Smoothing type" begin
+    s01a = Smoothing(0)
+    s01b = Smoothing(0.)
+    s01c = Smoothing(transition = 0.)
+    s01d = Smoothing(transition = 0., gain = 1.)
+    s01e = Smoothing(0., 1.)
+
+    @test s01a == NoSmoothing
+    @test s01a == s01b
+    @test s01a == s01c
+    @test s01a == s01d
+    @test s01a == s01e
+end
+
 @testset "Microgrid operation" begin
     # Relative tolerance for comparing statistics:
     rtol = 1e-10
