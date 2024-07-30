@@ -12,17 +12,21 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  145 to 146 μs (124 allocations: 689.20 KiB)
+timing of simulate(mg):  145 to 148 μs (122 allocations: 689.00 KiB)
 
 detailed timing of simulate(mg):
 - operation:  120    μs (22 allocations: 684.98 KiB)
 - aggregation: 21  μs (19 allocations: 304 bytes)
 - economics:    1.9 μs (81 allocations: 3.72 KiB)
 
-timing of gradient(sim_npc, x):  434 μs (128 allocations: 2.68 MiB)
-which represents 3.6× simulation time (gradient of dim 3).
+timing of gradient(sim_npc, x):  466 to 480 μs (128 allocations: 2.68 MiB)
+which represents 3.2× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2024-07-30: small performance decrease due to warm environment?
+
+Test run in room at 24°C
 
 ### 2024-06-11: small performance decrease due to ConsistentSalvage
 
