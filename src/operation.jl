@@ -30,7 +30,8 @@ can be applied, so that step(x) = gain for x ≥ `transition`.
     "step gain"
     gain::Float64 = 1.0
 end
-Smoothing(transition::Real=0.0) = Smoothing(transition=transition)
+# With only one positional argument, `gain` is set to default
+Smoothing(transition::Real) = Smoothing(transition=transition)
 "no smoothing of discontinuities (step functions)"
 const NoSmoothing = Smoothing(0.0, 1.0)
 
