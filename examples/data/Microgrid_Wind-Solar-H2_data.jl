@@ -49,15 +49,15 @@ power_rated_gen = 2000.  # rated power (kW) → /2 to see some load shedding
 fuel_intercept = 0.0 # fuel curve intercept (L/h/kW_max)
 fuel_slope = 0.240 # fuel curve slope (L/h/kW)
 # prices:
-fuel_price = 1. # fuel price ($/L)
+fuel_price = 1.0 # fuel price ($/L)
 investment_price_gen = 400. # initial investiment price ($/kW)
 om_price_hour_gen = 0.02 # operation & maintenance price ($/kW/h of operation)
-om_price_gen = 0.0 #
+om_price_gen = 0. #
 # other technical parameters
 lifetime_gen_y = 25.
-lifetime_gen_h = 15000. # generator lifetime (h)
-lifetime_gen_starts = 15000. # generator lmax starts on
-load_ratio_min_gen = 0.0 # minimum load ratio ∈ [0,1]
+lifetime_gen_h = 20000. # generator lifetime (h)
+lifetime_gen_starts = 5000. # generator lmax starts on
+load_ratio_min_gen = 0.1 # minimum load ratio ∈ [0,1]
 input_unit_gen = "L" # fuel quantity unit (used in fuel price and consumption curve parameters)
 output_unit_gen = "KWh"
 
@@ -145,6 +145,6 @@ investment_price_wind = 3500. # initial investiment price ($/kW)
 om_price_wind = 100.# operation and maintenance price ($/kW/y)
 lifetime_wind = 25. # lifetime (y)
 
-X=[5000., 5000., 1800., 2000., 1800., 12000.]./1000
+default_sizing= Sizing( 0.0, 5000.,  5000., 1800.,  2000., 1800.,  12000., 0.0)
 capex_def=[400., 0.0, 1600., 500., 1600., 350., 1200., 3500.]
 ini_filling_state=[0.0,0.0,0.0];

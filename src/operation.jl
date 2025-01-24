@@ -38,6 +38,7 @@ struct OperationTraj{T<:Real}
     Pdump::Vector{T}
 end
 
+
 """Aggregated statistics over the simulated Microgrid operation
 
 (simulation duration is assumed to be 1 year)
@@ -222,6 +223,7 @@ const oper_stats_units = Dict(
     :renew_rate => "in [0,1]"
 )
 
+
 """
     Base.show(io::IO, ::MIME"text/plain", stats::OperationStats)
 
@@ -242,33 +244,33 @@ end
 
 
 """
-    usage(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Int64,n_starts::Int64)
+    usage(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
 
 Allow to operate running statistics of production units
 """
-function usage(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
+function usage!(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
     Pprod_unit_max = prod_unit.power_rated
-    Pprod_unit_eps = Pprod_unit_max*1e-6
+    Pprod_unit_eps = Pprod_unit_max*1e-5
     prod_unit_intercept = prod_unit.consumption_intercept
     prod_unit_slope = prod_unit.consumption_slope
-    time_inc = 0
+    time_inc = 0.0
     cons_rate = 0
     if prod_unit_power > Pprod_unit_eps # prod_unit ON
         Pprod_unit_norm = prod_unit_power / (ε * Pprod_unit_max) # can be Inf e.g. for ε=0.0
         if Pprod_unit_norm <= 1.0
-            time_inc = 1 # relaxation of discontinuous prod_unit statistics for small Prod_unit_power
+            time_inc = Pprod_unit_norm*dt # relaxation of discontinuous prod_unit statistics for small Prod_unit_power
             cons_rate = Pprod_unit_norm * prod_unit_intercept * Pprod_unit_max +
             prod_unit_slope * prod_unit_power # (L/h)
         else
-            time_inc=1
+            time_inc=dt
             cons_rate = prod_unit_intercept * Pprod_unit_max +
             prod_unit_slope * prod_unit_power # (L/h)
         end
         if cr == 0.0
             n_starts+=1
         end
-        if prod_unit_power == Pprod_unit_max
-            c1+=1*dt
+        if prod_unit_power >= Pprod_unit_max - Pprod_unit_eps
+            c1+=dt
         end
         if prod_unit_power < minP
             minP=prod_unit_power
@@ -443,6 +445,7 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     ### Retrieve parameters
     dt = mg.project.timestep
     K = length(mg.load)
+    co= 8760/K
 
     ### Compute simple yearly statistics (sum, max...):
     # Load statistics
@@ -531,12 +534,12 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     Pload_avg = load_energy/(K*dt) # kW
     cr=zeros(Float64,3)
     for k = 1:K
-        gen_starts,gen_min_rp,gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_hours,gen_fuel=usage(oper_traj.Pgen[k],mg.dispatchables.generator[1],gen_hours,gen_fuel,gen_min_rp,dt,
+        gen_starts,gen_min_rp,gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_hours,gen_fuel=usage!(oper_traj.Pgen[k],mg.dispatchables.generator[1],gen_hours,gen_fuel,gen_min_rp,dt,
                                                                                                                      gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_starts)
 
-        fc_starts,fc_min_rp,fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_hours,fc_cons=usage(oper_traj.Pfc[k],mg.dispatchables.fuel_cell[1],fc_hours,fc_cons,fc_min_rp,dt,
+        fc_starts,fc_min_rp,fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_hours,fc_cons=usage!(oper_traj.Pfc[k],mg.dispatchables.fuel_cell[1],fc_hours,fc_cons,fc_min_rp,dt,
                                                                                                                     fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_starts)
-        elyz_starts,elyz_min_rp,elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_hours,elyz_cons=usage(oper_traj.Pelyz[k],mg.electrolyzer[1],elyz_hours,elyz_cons,elyz_min_rp,dt,
+        elyz_starts,elyz_min_rp,elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_hours,elyz_cons=usage!(oper_traj.Pelyz[k],mg.electrolyzer[1],elyz_hours,elyz_cons,elyz_min_rp,dt,
                                                                                                                     elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_starts)
         # Load shedding: shedding duration and maximum shedding duration
         Pshed = oper_traj.power_shedding[k]
@@ -568,19 +571,19 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     # Outputs
     oper_stats = OperationStats(
         # Load statistics
-        served_energy, shed_energy, shed_max, shed_hours, shed_duration_max, shed_rate,
+        served_energy*co, shed_energy*co, shed_max, shed_hours*co, shed_duration_max, shed_rate,
         # Dispatchable generator statistics
-        gen_energy, gen_hours, gen_starts,gen_fuel,gen_rt_at_nom,gen_min_rp,gen_avg_rp,gen_avg_rt,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2, 
+        gen_energy*co, gen_hours*co, gen_starts*co,gen_fuel*co,gen_rt_at_nom*co,gen_min_rp,gen_avg_rp,gen_avg_rt,gen_max_rt,gen_min_rt,gen_ru2*co,gen_ro2*co, 
         #H2 chain statistics
-        fc_produced_energy, fc_hours,fc_starts, fc_consumed_h2,fc_rt_at_nom,fc_min_rp,fc_avg_rp,fc_avg_rt,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,
-        elyz_produced_h2, elyz_hours,elyz_starts, elyz_consumed_energy,elyz_rt_at_nom,elyz_min_rp,elyz_avg_rp,elyz_avg_rt,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,
-        chain_loss,
+        fc_produced_energy*co, fc_hours*co,fc_starts*co, fc_consumed_h2*co,fc_rt_at_nom*co,fc_min_rp,fc_avg_rp,fc_avg_rt,fc_max_rt,fc_min_rt,fc_ru2*co,fc_ro2*co,
+        elyz_produced_h2*co, elyz_hours*co,elyz_starts*co, elyz_consumed_energy*co,elyz_rt_at_nom*co,elyz_min_rp,elyz_avg_rp,elyz_avg_rt,elyz_max_rt,elyz_min_rt,elyz_ru2*co,elyz_ro2*co,
+        chain_loss*co,
 
         # Energy storage (e.g. battery) statistics
-        storage_cycles, storage_char_energy, storage_dis_energy, storage_loss_energy,
+        storage_cycles*co, storage_char_energy*co, storage_dis_energy*co, storage_loss_energy*co,
         # Non-dispatchable (typ. renewables) sources statistics
-        spilled_energy, spilled_max, spilled_rate,dumped_energy,dumped_max,
-        renew_potential_energy, renew_energy, renew_rate
+        spilled_energy*co, spilled_max, spilled_rate,dumped_energy*co,dumped_max,
+        renew_potential_energy*co, renew_energy*co, renew_rate
     )
     return oper_stats
 end

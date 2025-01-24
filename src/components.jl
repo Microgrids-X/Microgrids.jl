@@ -14,6 +14,18 @@ struct Project
     currency::String
 end
 
+struct Sizing
+   
+    Cgen::Float64
+    Cbatt::Float64
+    Cpv::Float64
+    Cwind::Float64
+    Cfc::Float64
+    Cel::Float64
+    Htank::Float64
+    Ftank::Float64
+end
+
 """
 ProductionUnit
 Unit used to product gaz or energy

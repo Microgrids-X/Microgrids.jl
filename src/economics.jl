@@ -208,7 +208,7 @@ function component_costs(mg_project::Project, lifetime::Real,
             end 
         end
 
-        salvage_formula = :LinearSalvage
+        salvage_formula = :ConsistentSalvage
         if salvage_formula == :LinearSalvage
             # remaining lifetime of last component at the project end
             remaining_life = lifetime*(1+replacements_number) - mg_lifetime
