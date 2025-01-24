@@ -1,6 +1,6 @@
 MIT License
 
-Copyright © 2021-2023 by Evelise de G. Antunes, Nabil Sadou and Pierre Haessig
+Copyright © 2021-2023 by Evelise de G. Antunes, Nabil Sadou Pierre Haessig and Jean Fructhieu NIKIEMA
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
