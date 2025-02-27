@@ -71,12 +71,24 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
       capex[8], om_price_wind,
       lifetime_wind,
       replacement_price_ratio, salvage_price_ratio)
-  
- mg = Microgrid(project, load,dispatchables,
-  [elyz,],tanks,batt, [
+      hb=ProductionUnit(sizing.Hb,cons_intercept_hb, cons_rate_hb,cons_price_hb,capex[3], om_price_hour_hb, om_price_hb,lifetime_hb_y,lifetime_hb_h,lifetime_hb_starts,
+      load_min_ratio_hb,replacement_price_ratio, salvage_price_ratio,input_unit_hb,output_unit_hb)
+
+      if sizing.Hb==0
+        mg = Microgrid(project, load,dispatchables,
+        [elyz,],tanks,batt, [
       pv,
       windgen
       ])
+      else
+
+    mg = Microgrid_nh3(project, load,dispatchables,
+[elyz,],hb,tanks,batt, [
+    pv,
+    windgen
+    ])
+    end
+
   return mg
   end
 
@@ -112,16 +124,15 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
         return oper_traj, oper_stats, mg_costs
     end
     
-
-
+# to update
     function save_mg(mg::Microgrid , stats::OperationStats, traj::OperationTraj, path::String,mg_name::String)
         mkdir(mg_name)
         proj_path=path*mg_name*"/"
         nsteps=Int(length(mg.load)/mg.project.timestep)
         size_frame=DataFrame(Cgen=Float64[],
-        Cbatt=Float64[],Cpv=Float64[],Cwind=Float64[],Cfc=Float64[],Cel=Float64[],Htank=Float64[],Ftank=Float64[])
+        Cbatt=Float64[],Cpv=Float64[],Cwind=Float64[],Cfc=Float64[],Cel=Float64[],Htank=Float64[],Ftank=Float64[],Hb=Float64[])
         push!(size_frame,(mg.dispatchables.generator[1].power_rated,mg.storage.energy_rated,mg.nondispatchables[1].power_rated,mg.nondispatchables[2].power_rated,
-        mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity))
+        mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity,0.0))
         CSV.write(proj_path*"sizing.csv",size_frame)
 
         op_frame=DataFrame([name => [] for name in propertynames(stats)])
@@ -135,7 +146,7 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
 
     function load_mg(project_path :: String)
         sizing_df = DataFrame(CSV.File(project_path*"/sizing.csv"))
-        sizing= Sizing(sizing_df[1,1],sizing_df[1,2],sizing_df[1,3],sizing_df[1,4],sizing_df[1,5],sizing_df[1,6],sizing_df[1,7],sizing_df[1,8])
+        sizing= Sizing(sizing_df[1,1],sizing_df[1,2],sizing_df[1,3],sizing_df[1,4],sizing_df[1,5],sizing_df[1,6],sizing_df[1,7],sizing_df[1,8],0.0)
         
         traj_df = DataFrame(CSV.File(project_path*"/traj.csv"))
         traj= OperationTraj(traj_df[:,1],traj_df[:,2],traj_df[:,3],traj_df[:,4],traj_df[:,5],traj_df[:,6],traj_df[:,7],traj_df[:,8],traj_df[:,9],traj_df[:,10],traj_df[:,11],traj_df[:,12],)
