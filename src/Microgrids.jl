@@ -71,23 +71,17 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
       capex[8], om_price_wind,
       lifetime_wind,
       replacement_price_ratio, salvage_price_ratio)
+
       hb=ProductionUnit(sizing.Hb,cons_intercept_hb, cons_rate_hb,cons_price_hb,capex[3], om_price_hour_hb, om_price_hb,lifetime_hb_y,lifetime_hb_h,lifetime_hb_starts,
       load_min_ratio_hb,replacement_price_ratio, salvage_price_ratio,input_unit_hb,output_unit_hb)
 
-      if sizing.Hb==0
-        mg = Microgrid(project, load,dispatchables,
-        [elyz,],tanks,batt, [
-      pv,
-      windgen
-      ])
-      else
 
-    mg = Microgrid_nh3(project, load,dispatchables,
+    mg = Microgrid(project, load,dispatchables,
 [elyz,],hb,tanks,batt, [
     pv,
     windgen
     ])
-    end
+   
 
   return mg
   end

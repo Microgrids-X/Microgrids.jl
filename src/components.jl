@@ -320,24 +320,6 @@ struct Microgrid{Topt<:Real}
     dispatchables:: DispatchableCompound{Topt}
     "electrolyzer"
     electrolyzer :: Vector{ProductionUnit{Topt}}
-    "Tanks compound"
-    tanks :: TankCompound{Topt}
-    "energy storage (e.g. battery)"
-    storage::Battery{Topt}
-    "non-dispatchable sources (e.g. renewables like wind and solar)"
-    nondispatchables
-end
-
-"""Microgrid system description"""
-struct Microgrid_nh3{Topt<:Real}
-    "microgrid project information"
-    project::Project
-    "desired load time series (kW)"
-    load::Vector{Float64}
-    " Dispatchable Compound"
-    dispatchables:: DispatchableCompound{Topt}
-    "electrolyzer"
-    electrolyzer :: Vector{ProductionUnit{Topt}}
     "process Haber-Bosch"
     haber_bosch :: ProductionUnit{Topt}
     "Tanks compound"

@@ -112,6 +112,7 @@ end
     h2_tank :: Vector{Float64}
     pv :: Vector{Float64}
     wind :: Vector{Float64}
+    hb :: Vector{Float64}
     
 
 end
@@ -143,6 +144,7 @@ also includes `system` cost (all components) and two key economic data:
     fuel_cell:: CostFactors
     fuel_tank:: CostFactors
     h2_tank:: CostFactors
+    hb:: CostFactors
     cashflow :: MicrogridCashflow
 end
 
@@ -255,7 +257,7 @@ function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_un
     fuel_annual = prod_unit.combustible_price * prod_unit_cons
 
     # effective production unit  lifetime (in years)
-    if prod_unit_hours > 0.0 || prod_unit_hours >0.0
+    if prod_unit_hours > 0.0 || prod_unit_starts >0.0
     lifetime = min(prod_unit.lifetime_hours / prod_unit_hours,prod_unit.lifetime_on_off / prod_unit_starts, prod_unit.lifetime_calendar)
     else
     lifetime = prod_unit.lifetime_calendar
@@ -400,6 +402,7 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
     fc_costs,fc_cashflow = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.fc_starts,oper_stats.h2_consumed)
     fuel_tank_cost,fuel_tank_cashflow = component_costs(mg.tanks.fuelTank, mg.project)
     h2_tank_cost ,h2_tank_cashflow = component_costs(mg.tanks.h2Tank, mg.project)
+    hb_costs,hb_cashflow = component_costs(mg.haber_bosch, mg.project, oper_stats.hb_hours,oper_stats.hb_starts,oper_stats.hb_cons)
     # Energy storage
     sto_costs, sto_cashflow = component_costs(mg.storage, mg.project, oper_stats)
 
@@ -420,7 +423,7 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
                         for i = 1:mg.project.lifetime]
     crf = 1/sum(discount_factors)
     # Cost of all components and NPC of the project
-    system_costs = gen_costs + sto_costs + sum(nd_costs) + elyz_costs + fc_costs + fuel_tank_cost + h2_tank_cost
+    system_costs = gen_costs + sto_costs + sum(nd_costs) + elyz_costs + fc_costs + fuel_tank_cost + h2_tank_cost + hb_costs
     npc = system_costs.total
     
     # levelized cost of energy
@@ -428,7 +431,7 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
     lcoe = annualized_cost / oper_stats.served_energy # ($/y) / (kWh/y) → $/kWh
 
     costs = MicrogridCosts(lcoe, npc,
-        system_costs, gen_costs, sto_costs, nd_costs, elyz_costs,fc_costs,fuel_tank_cost,h2_tank_cost,MicrogridCashflow(gen_cashflow,fuel_tank_cashflow,sto_cashflow,fc_cashflow,elyz_cashflow,h2_tank_cashflow,pv_cashflow,wind_cashflow)
+        system_costs, gen_costs, sto_costs, nd_costs, elyz_costs,fc_costs,fuel_tank_cost,h2_tank_cost,hb_costs,MicrogridCashflow(gen_cashflow,fuel_tank_cashflow,sto_cashflow,fc_cashflow,elyz_cashflow,h2_tank_cashflow,pv_cashflow,wind_cashflow,hb_cashflow)
     )
 
     return costs

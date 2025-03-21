@@ -22,6 +22,8 @@ struct OperationTraj{T<:Real}
      # electrolyzer
     "Electrolyzer power at each time instant (kW)"
     Pelyz:: Vector{T}
+    "haber_bosch power at each time instant (kW)"
+    Phb:: Vector{T}
     # battery
     "Battery energy at each time instant (kWh)"
     Ebatt::Vector{T}
@@ -147,6 +149,34 @@ struct OperationStats
     storage_dis_energy
     "energy lossed in the energy storage (kWh/y)"
     storage_loss_energy
+    
+    # haber-bosch statistics
+    "energy supplied to the hb (kWh/y)"
+    hb_cons_el
+    "hydrogen supplied to the hb (kg/y)"
+    hb_cons_h2
+    "cumulated operating hours of the dispatchable generator (h/y)"
+    hb_hours
+    "cumulated starts on of the dispatchable generator "
+    hb_starts
+    "fuel consumption (L/y)"
+    hb_prod
+    "running time at nominal power"
+    hb_rt_at_nom
+    "minimum running power"
+    hb_min_rp
+    "average running power"
+    hb_avg_rp
+    "average running time by per start"
+    hb_avg_rt
+    "maximum running time per start"
+    hb_max_rt
+    "minimum running time per start"
+    hb_min_rt
+    "number of runs that last 2h or less"
+    hb_ru2
+    "number of runs that last more than 2h"
+    hb_ro2 
 
     # Non-dispatchable (typ. renewables) sources statistics
     "spilled energy (typ. from excess of renewables) (kWh/y)"
@@ -213,6 +243,19 @@ const oper_stats_units = Dict(
     :storage_char_energy => "kWh",
     :storage_dis_energy => "kWh",
     :storage_loss_energy => "kWh",
+    :hb_cons_el => "kWh",
+    :hb_cons_h2 => "kWh",
+    :hb_hours => "h",
+    :hb_starts => "",
+    :hb_prod => "kg",
+    :hb_rt_at_nom => "h",
+    :hb_min_rp => "h",
+    :hb_avg_rp => "kWh",
+    :hb_avg_rt => "h",
+    :hb_max_rt => "h",
+    :hb_min_rt => "h",
+    :hb_ru2 => "",
+    :hb_ro2  => "",
     :spilled_energy => "kWh",
     :spilled_max => "kW",
     :spilled_rate => "in [0,1]",
@@ -366,6 +409,7 @@ function operation(mg::Microgrid, dispatch::Function)
     Pfc_emax = zeros(Topt, n_fc) 
     Pfc_pmax = zeros(Topt, n_fc)
 
+    Phb = zeros(Topt,K)
     LoH = zeros(Topt,K+1)
     LoF = zeros(Topt,K+1)
 
@@ -422,7 +466,7 @@ function operation(mg::Microgrid, dispatch::Function)
 
     end
 
-    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen[:,1], Pfc[:,1], Pelyz[:,1], Esto, Psto, LoH, LoF, Pspill,Pdump)
+    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen[:,1], Pfc[:,1], Pelyz[:,1],Phb[:,1], Esto, Psto, LoH, LoF, Pspill,Pdump)
     
     return oper_traj
 end
@@ -479,7 +523,11 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     LoHfin = oper_traj.LoH[end]
     LoHini = oper_traj.LoH[1]
     chain_loss =  elyz_consumed_energy - fc_produced_energy -(LoHfin-LoHini)*mg.dispatchables.fuel_cell[1].consumption_slope
-
+     # Haber-bosch statistics 
+     hb_cons_el = sum(oper_traj.Phb) * dt
+     hb_prod = hb_cons_el / mg.haber_bosch.consumption_slope
+     hb_cons_h2=  hb_prod*0.176
+     
     # Non-dispatchable (typ. renewables) sources statistics
     spilled_energy = sum(oper_traj.power_curtailment) * dt # kWh/y
     spilled_max = maximum(oper_traj.power_curtailment) # kW
@@ -528,11 +576,21 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     fc_min_rt=K*dt;
     fc_ru2=0;
     fc_ro2=0;
+    hb_hours=0.;
+    hb_starts=0;
+    hb_rt_at_nom=0.;
+    hb_min_rp=mg.haber_bosch.power_rated;
+    hb_avg_rp=0.;
+    hb_avg_rt=0.;
+    hb_max_rt=0.;
+    hb_min_rt=0.;
+    hb_ru2=0;
+    hb_ro2 =0;
 
     # auxilliary counter:
     shed_duration = 0.0; # duration of current load shedding event (h)
     Pload_avg = load_energy/(K*dt) # kW
-    cr=zeros(Float64,3)
+    cr=zeros(Float64,4)
     for k = 1:K
         gen_starts,gen_min_rp,gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_hours,gen_fuel=usage!(oper_traj.Pgen[k],mg.dispatchables.generator[1],gen_hours,gen_fuel,gen_min_rp,dt,
                                                                                                                      gen_rt_at_nom,gen_max_rt,gen_min_rt,gen_ru2,gen_ro2,cr[1],gen_starts)
@@ -541,6 +599,9 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
                                                                                                                     fc_rt_at_nom,fc_max_rt,fc_min_rt,fc_ru2,fc_ro2,cr[2],fc_starts)
         elyz_starts,elyz_min_rp,elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_hours,elyz_cons=usage!(oper_traj.Pelyz[k],mg.electrolyzer[1],elyz_hours,elyz_cons,elyz_min_rp,dt,
                                                                                                                     elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_starts)
+
+        hb_starts,hb_min_rp,hb_rt_at_nom,hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,cr[4],hb_hours,hb_cons=usage!(oper_traj.Phb[k],mg.haber_bosch,hb_hours,hb_cons,hb_min_rp,dt,
+                                                                                                                    hb_rt_at_nom,hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,cr[4],hb_starts)
         # Load shedding: shedding duration and maximum shedding duration
         Pshed = oper_traj.power_shedding[k]
         if Pshed > 0.0
@@ -567,9 +628,11 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     fc_avg_rt=fc_hours/fc_starts;
     elyz_avg_rp= sum(oper_traj.Pelyz)/elyz_hours;
     elyz_avg_rt=elyz_hours/elyz_starts;
+    hb_avg_rp= sum(oper_traj.Phb)/hb_hours;
+    hb_avg_rt= hb_hours/hb_starts;
 
     # Outputs
-    oper_stats = OperationStats(
+oper_stats = OperationStats(
         # Load statistics
         served_energy*co, shed_energy*co, shed_max, shed_hours*co, shed_duration_max, shed_rate,
         # Dispatchable generator statistics
@@ -581,6 +644,10 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
 
         # Energy storage (e.g. battery) statistics
         storage_cycles*co, storage_char_energy*co, storage_dis_energy*co, storage_loss_energy*co,
+         # Energy storage (e.g. battery) statistics
+        hb_cons_el, hb_cons_h2,hb_hours,hb_starts,hb_prod,hb_rt_at_nom,hb_min_rp,hb_avg_rp,hb_avg_rt,
+        hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,
+
         # Non-dispatchable (typ. renewables) sources statistics
         spilled_energy*co, spilled_max, spilled_rate,dumped_energy*co,dumped_max,
         renew_potential_energy*co, renew_energy*co, renew_rate

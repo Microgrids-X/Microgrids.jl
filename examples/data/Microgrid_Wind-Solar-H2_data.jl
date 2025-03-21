@@ -102,17 +102,20 @@ output_unit_fc="KWh"
 #Haber Bosch numbers to update!!! they have been taken arbitrary
 power_rated_hb = 4000. # rated power capacity (KW)
 cons_intercept_hb=0. #
-cons_rate_hb = 0.0625 # consumption rate (KWhé/KgH2)
+cons_rate_hb = 0.344 # consumption rate (KWhé/KgH2)
 cons_price_hb = 0. #
-investment_price_hb = 1600. # initial investment price  ($/KW)
-om_price_hb = 45. # operation and maintenance price ($/kW/y) 
+investment_price_hb_only = 0.418*580 #energy consumption of HB process for 1 kW of HB+ASU multiplied by CAPEX of HB ($/kW) [Achour et al., 2025]
+investment_price_asu_only = 0.582*224 #energy consumption of ASU for 1 kW of HB+ASU multiplied by CAPEX of ASU ($/kW) [Achour et al., 2025]
+investment_price_hb = investment_price_asu_only+investment_price_hb_only # initial investment price ($/KW)
+om_price_hb = 0.017*1000 # operation and maintenance price ($/kW/y)[Achour et al., 2025]
 om_price_hour_hb = 0. # operation and maintenance price ($/kW/h)
-lifetime_hb_y = 15.
-lifetime_hb_h = 45000. # Fuel Cell lifetime (h)
+lifetime_hb_y = 25.
+lifetime_hb_h = 45000. # FOR NOW NOT USED. THIS IS THE VALUE FOR FUELL CELL.
 lifetime_hb_starts = 5000. # fuel cell maximum starts on
-load_min_ratio_hb= 0.05 # minimum load ratio ∈ [0,1]
+load_min_ratio_hb= 0.3 # minimum load ratio ∈ [0,1]
 input_unit_hb= "Kwh"
 output_unit_hb="Kg"
+
 
 
 # Battery energy storage
@@ -160,6 +163,6 @@ investment_price_wind = 3500. # initial investiment price ($/kW)
 om_price_wind = 100.# operation and maintenance price ($/kW/y)
 lifetime_wind = 25. # lifetime (y)
 
-default_sizing= Sizing( 0.0, 5000.,  5000., 1800.,  2000., 1800.,  12000., 0.0,4000.0)
+default_sizing= Sizing( 0.0, 5000.,  5000., 1800.,  2000., 1800.,  12000., 0.0,0.0)
 capex_def=[400., 0.0, 1600., 500., 1600., 350., 1200., 3500.]
 ini_filling_state=[0.0,0.0,0.0];
