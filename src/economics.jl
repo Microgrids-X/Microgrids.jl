@@ -402,7 +402,7 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
     fc_costs,fc_cashflow = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.fc_starts,oper_stats.h2_consumed)
     fuel_tank_cost,fuel_tank_cashflow = component_costs(mg.tanks.fuelTank, mg.project)
     h2_tank_cost ,h2_tank_cashflow = component_costs(mg.tanks.h2Tank, mg.project)
-    hb_costs,hb_cashflow = component_costs(mg.haber_bosch, mg.project, oper_stats.hb_hours,oper_stats.hb_starts,oper_stats.hb_cons)
+    hb_costs,hb_cashflow = component_costs(mg.haber_bosch, mg.project, oper_stats.hb_hours,oper_stats.hb_starts,oper_stats.hb_cons_el)
     # Energy storage
     sto_costs, sto_cashflow = component_costs(mg.storage, mg.project, oper_stats)
 
