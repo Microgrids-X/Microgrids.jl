@@ -600,7 +600,7 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
         elyz_starts,elyz_min_rp,elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_hours,elyz_cons=usage!(oper_traj.Pelyz[k],mg.electrolyzer[1],elyz_hours,elyz_cons,elyz_min_rp,dt,
                                                                                                                     elyz_rt_at_nom,elyz_max_rt,elyz_min_rt,elyz_ru2,elyz_ro2,cr[3],elyz_starts)
 
-        hb_starts,hb_min_rp,hb_rt_at_nom,hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,cr[4],hb_hours,hb_cons_el=usage!(oper_traj.Phb[k],mg.haber_bosch,hb_hours,hb_cons,hb_min_rp,dt,
+        hb_starts,hb_min_rp,hb_rt_at_nom,hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,cr[4],hb_hours,hb_cons_el=usage!(oper_traj.Phb[k],mg.haber_bosch,hb_hours,hb_cons_el,hb_min_rp,dt,
                                                                                                                     hb_rt_at_nom,hb_max_rt,hb_min_rt,hb_ru2,hb_ro2,cr[4],hb_starts)
         # Load shedding: shedding duration and maximum shedding duration
         Pshed = oper_traj.power_shedding[k]
