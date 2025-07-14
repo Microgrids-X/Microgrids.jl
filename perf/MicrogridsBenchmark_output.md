@@ -26,9 +26,10 @@ which represents 15× simulation time (gradient of dim 3).
 
 ### 2024-07-14: major performance drop with gradient + minor changes with 1.11
 
-Test run in warm environment, in room at 25°C.
+(Test run in warm environment, in room at 25°C)
 
-Update to Julia 1.11.6 and ForwardDiff v1.0.1
+- Minor update of Microgrids to 0.11.1
+- Environment Update to Julia 1.11.6 and ForwardDiff v1.0.1
 
 Simulation timings quite similar, with a minor increase in number of allocations
 (translating in a tiny increase or decrease in the allocated memory size

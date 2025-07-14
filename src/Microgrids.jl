@@ -4,7 +4,7 @@ import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
 export simulate,
        SalvageType, LinearSalvage, ConsistentSalvage,
-       Project, Microgrid,
+       Project, Microgrid, Component,
        DispatchableGenerator, Battery,
        NonDispatchableSource, Photovoltaic, PVInverter, WindPower,
        capacity_from_wind,

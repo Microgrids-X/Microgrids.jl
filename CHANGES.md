@@ -1,5 +1,15 @@
 # CHANGELOG for Microgrids.jl
 
+## v0.11.1
+
+Jul 14, 2025
+
+- Implement the `Base.copy` method for all microgrid structures
+  (`Microgrid`, `Project` and all components)
+- Under the hood: all components (battery, pv...) are now subtypes of
+  one `Component` supertype
+
+
 ## v0.11.0
 
 Jul 30, 2024
@@ -8,14 +18,14 @@ Cumulated changes of Spring/Summer 2024:
 
 - Implement **economically consistent salvage value** definition, see our report Pierre Haessig. Economic consistency of salvage value definitions. 2024. [⟨hal-04097092v2⟩](https://hal.science/hal-04097092v2)
   - Microgrid's `Project` description structure accepts a new `salvage_type` argument, with the default value being `LinearSalvage` which is the classical and previous behavior, but which can be changed to `ConsistentSalvage`
-- Add new `smoothing` parameter of the toplevel microgrid `simulate` function. It replaces and generalizes the relaxation parameter `ε` introduced in v0.10.2. 
+- Add new `smoothing` parameter of the toplevel microgrid `simulate` function. It replaces and generalizes the relaxation parameter `ε` introduced in v0.10.2.
   - Default value is `NoSmoothing` but can be set to any `Smoothing` instance
-  - the former`ε` parameter corresponds to the first field of the `Smoothing` structure, which is named `transition`. 
+  - the former`ε` parameter corresponds to the first field of the `Smoothing` structure, which is named `transition`.
   - the 2nd parameter if the `Smoothing` structure is `gain`, which is 1.0 by default, but can be increased to heuristically compensate for the underapproximation when using a strictly positive `transition` value.
 - The structures for describing Microgrid projects (`Microgrid`, `Project` and all components such as `Battery`) are now:
   - **mutable** (fields can be changed after creation)
   - accept **keyword** arguments
-  - have sensible **defaults** for secondary parameters, matching Microgrids.py interface 
+  - have sensible **defaults** for secondary parameters, matching Microgrids.py interface
 
 
 ## v0.10.2
