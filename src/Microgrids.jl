@@ -28,9 +28,9 @@ Discontinuous computations can optionally be smoothed (relaxed) using the
 Smoothing is recommended when using gradient-based optimization.
 
 Returns:
-- Operational trajectories from `sim_operation` (should be optional in future version)
-- Operational statistics from `sim_operation`
-- Microgrid project costs from `sim_economics`
+- Operational trajectories from `operation` (should be optional in future version)
+- Operational statistics from `operation`
+- Microgrid project costs from `economics`
 """
 function simulate(mg::Microgrid, smoothing::Smoothing=NoSmoothing)
     # Run the microgrid operation

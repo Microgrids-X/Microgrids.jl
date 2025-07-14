@@ -63,6 +63,23 @@ Project(lifetime::Real, discount_rate::Real, timestep::Real, currency::String) =
     # default salvage_type
 )
 
+
+"""
+    Base.copy(p::Project)
+
+Create a shallow copy of Microgrid project information `p`.
+
+Notice: since all `Project` fields are immutable, it is fine to change any
+field values of the copy without altering the original.
+"""
+Base.copy(p::Project) = Project(
+    p.lifetime,
+    p.discount_rate,
+    p.timestep,
+    p.currency,
+    p.salvage_type
+)
+
 """
 Dispatchable power source
 (e.g. Diesel generator, Gas turbine, Fuel cell)
@@ -127,6 +144,13 @@ Base.:(==)(c1::DispatchableGenerator, c2::DispatchableGenerator) = all(
     getfield(c1, field) == getfield(c2, field)
     for field in fieldnames(DispatchableGenerator))
 
+"shallow copy for a `DispatchableGenerator` component"
+function Base.copy(c::DispatchableGenerator)
+    T = typeof(c)
+    args = (getfield(c, name) for name in fieldnames(T))
+    return T(args...)
+end
+
 """
 Battery energy storage (including AC/DC converter)
 
@@ -186,6 +210,13 @@ Base.:(==)(c1::Battery, c2::Battery) = all(
     getfield(c1, field) == getfield(c2, field)
     for field in fieldnames(Battery))
 
+"shallow copy for a `Battery` component"
+function Base.copy(c::Battery)
+    T = typeof(c)
+    args = (getfield(c, name) for name in fieldnames(T))
+    return T(args...)
+end
+
 "Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
 abstract type NonDispatchableSource end
 
@@ -193,6 +224,13 @@ abstract type NonDispatchableSource end
 Base.:(==)(c1::Source, c2::Source) where {Source <: NonDispatchableSource} = all(
     getfield(c1, field) == getfield(c2, field)
     for field in fieldnames(Source))
+
+"shallow copy for a non-dispatchable sources (e.g. renewables like wind and solar)"
+function Base.copy(c::Source) where {Source <: NonDispatchableSource}
+    T = typeof(c)
+    args = (getfield(c, name) for name in fieldnames(T))
+    return T(args...)
+end
 
 """Solar photovoltaic generator (including AC/DC converter)
 
@@ -340,3 +378,19 @@ WindPower(power_rated::Topt, capacity_factor::Vector{Float64},
     "non-dispatchable sources (e.g. renewables like wind and solar)"
     nondispatchables #::Vector{NonDispatchableSource}
 end
+
+"""
+    Base.copy(mg::Microgrid)
+
+Create a shallow copy of Microgrid system description `mg`.
+
+Notice: since all `Microgrid` fields are mutable, changes made to the fields
+values of the copy will reflect in the original, unless fields were also copied.
+"""
+Base.copy(mg::Microgrid) = Microgrid(
+    mg.project,
+    mg.load,
+    mg.generator,
+    mg.storage,
+    mg.nondispatchables
+)
