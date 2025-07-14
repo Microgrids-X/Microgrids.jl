@@ -68,9 +68,6 @@ Project(lifetime::Real, discount_rate::Real, timestep::Real, currency::String) =
     Base.copy(p::Project)
 
 Create a shallow copy of Microgrid project information `p`.
-
-Notice: since all `Project` fields are immutable, it is fine to change any
-field values of the copy without altering the original.
 """
 Base.copy(p::Project) = Project(
     p.lifetime,
@@ -79,6 +76,27 @@ Base.copy(p::Project) = Project(
     p.currency,
     p.salvage_type
 )
+
+################################################################################
+# Microgrid components
+"Base type for Microgrid component (power sources, storage...)"
+abstract type Component end
+
+"test equality between two Microgrid components" # needed for *mutable* struct
+Base.:(==)(c1::Comp, c2::Comp) where {Comp <: Component} = all(
+    getfield(c1, field) == getfield(c2, field)
+    for field in fieldnames(Comp))
+
+"""
+    Base.copy(c::Comp) where {Comp <: Component}
+
+Create a shallow copy of a Microgrid component
+"""
+function Base.copy(c::Comp) where {Comp <: Component}
+    T = typeof(c)
+    args = (getfield(c, name) for name in fieldnames(T))
+    return T(args...)
+end
 
 """
 Dispatchable power source
@@ -91,7 +109,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-@kwdef mutable struct DispatchableGenerator{Topt<:Real}
+@kwdef mutable struct DispatchableGenerator{Topt<:Real} <: Component
     # Main technical parameters
     "rated power (kW)"
     power_rated::Topt
@@ -139,18 +157,6 @@ DispatchableGenerator(
     investment_price, om_price_hours, lifetime_hours, load_ratio_min
 )
 
-"test equality between two components" # needed for *mutable* struct
-Base.:(==)(c1::DispatchableGenerator, c2::DispatchableGenerator) = all(
-    getfield(c1, field) == getfield(c2, field)
-    for field in fieldnames(DispatchableGenerator))
-
-"shallow copy for a `DispatchableGenerator` component"
-function Base.copy(c::DispatchableGenerator)
-    T = typeof(c)
-    args = (getfield(c, name) for name in fieldnames(T))
-    return T(args...)
-end
-
 """
 Battery energy storage (including AC/DC converter)
 
@@ -165,7 +171,7 @@ All component parameters should be `Float64` except for the
 which type is parametrized as `Topt` and may be also `Float64` or
 or any another `Real` type (e.g. ForwardDiff's dual number type).
 """
-@kwdef mutable struct Battery{Topt<:Real}
+@kwdef mutable struct Battery{Topt<:Real} <: Component
     # Main technical parameters
     "rated energy capacity (kWh)"
     energy_rated::Topt
@@ -205,32 +211,8 @@ Battery(energy_rated::Topt, investment_price::Real, om_price::Real,
     energy_rated, investment_price, om_price, lifetime_calendar, lifetime_cycles
 )
 
-"test equality between two components" # needed for *mutable* struct
-Base.:(==)(c1::Battery, c2::Battery) = all(
-    getfield(c1, field) == getfield(c2, field)
-    for field in fieldnames(Battery))
-
-"shallow copy for a `Battery` component"
-function Base.copy(c::Battery)
-    T = typeof(c)
-    args = (getfield(c, name) for name in fieldnames(T))
-    return T(args...)
-end
-
 "Base type for non-dispatchable sources (e.g. renewables like wind and solar)"
-abstract type NonDispatchableSource end
-
-"test equality between two components" # needed for *mutable* struct
-Base.:(==)(c1::Source, c2::Source) where {Source <: NonDispatchableSource} = all(
-    getfield(c1, field) == getfield(c2, field)
-    for field in fieldnames(Source))
-
-"shallow copy for a non-dispatchable sources (e.g. renewables like wind and solar)"
-function Base.copy(c::Source) where {Source <: NonDispatchableSource}
-    T = typeof(c)
-    args = (getfield(c, name) for name in fieldnames(T))
-    return T(args...)
-end
+abstract type NonDispatchableSource <: Component end
 
 """Solar photovoltaic generator (including AC/DC converter)
 
@@ -384,8 +366,16 @@ end
 
 Create a shallow copy of Microgrid system description `mg`.
 
-Notice: since all `Microgrid` fields are mutable, changes made to the fields
-values of the copy will reflect in the original, unless fields were also copied.
+Notice: all `Microgrid` fields contains mutable data (`Project`, `Component`s
+or Arrays of `Component`s). Those sub-structures are *not* copied by this method.
+Copying them should be done manually afterwards if needed.
+
+Example to make a Microgrid copy with a different discount rate:
+```
+mg1 = copy(mg) # assuming mg=Microgrid(...)
+mg1.project = copy(mg1.project) # create a `Project` copy
+mg1.project.discount_rate = 0.10 # mg.project.discount_rate unchanged
+```
 """
 Base.copy(mg::Microgrid) = Microgrid(
     mg.project,
