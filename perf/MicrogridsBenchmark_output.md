@@ -2,7 +2,7 @@
 
 ## System configuration
 
-Julia version 1.10.4
+Julia version 1.11.6
 
 Results obtained in Ubuntu 22.04, with external power adapter,
 using the “Performance” mode in Gnome Settings/Energy.
@@ -12,17 +12,32 @@ This setting can have an major influence:
 
 ## Results
 
-timing of simulate(mg):  145 to 148 μs (122 allocations: 689.00 KiB)
+timing of simulate(mg):  150 μs (138 allocations: 688.58 KiB)
 
 detailed timing of simulate(mg):
-- operation:  120    μs (22 allocations: 684.98 KiB)
-- aggregation: 21  μs (19 allocations: 304 bytes)
-- economics:    1.9 μs (81 allocations: 3.72 KiB)
+- operation:  120   μs (33 allocations: 685.22 KiB)
+- aggregation: 25   μs (19 allocations:     304 bytes)
+- economics:    1.9 μs (86 allocations:   3.06 KiB)
 
-timing of gradient(sim_npc, x):  466 to 480 μs (128 allocations: 2.68 MiB)
-which represents 3.2× simulation time (gradient of dim 3).
+timing of gradient(sim_npc, x):  2200 μs (96512 allocations: 6.35 MiB)
+which represents 15× simulation time (gradient of dim 3).
 
 ## Changes
+
+### 2024-07-14: major performance drop with gradient + minor changes with 1.11
+
+Test run in warm environment, in room at 25°C.
+
+Update to Julia 1.11.6 and ForwardDiff v1.0.1
+
+Simulation timings quite similar, with a minor increase in number of allocations
+(translating in a tiny increase or decrease in the allocated memory size
+depending on the function).
+
+Major performance drop for gradient computation:
+- 480 µs to 2200 µs (×5)
+- 128 to 96512 allocation (with a ×2 increase in the allocated memory size)
+- Performance drop bissected to the ForwardDiff v0.10.38 ⇒ v1.0.0 update (March 2025)
 
 ### 2024-07-30: small performance decrease due to warm environment?
 
