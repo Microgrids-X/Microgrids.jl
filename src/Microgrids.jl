@@ -23,7 +23,7 @@ module Microgrids
 
     import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
-    export simulate,save_mg,load_mg,new_microgrid,
+    export simulate,save_mg,load_mg,new_microgrid,simulate_pnl,
         NonDispatchableSource, ProductionUnit, Tank, TankCompound, 
         Project, Sizing,DispatchableCompound,Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
         capacity_from_wind,
@@ -40,7 +40,9 @@ module Microgrids
 
 """
         
-function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=capex_def,initial_fill_rate::Vector{Float64}=ini_filling_state,load::Vector{Float64}=Pload)
+function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=capex_def,initial_fill_rate::Vector{Float64}=ini_filling_state,load::Vector{Float64}=Pload,
+    wind_speed::Vector{Float64}=wind_speed,irradiance::Vector{Float64}=irradiance)
+    cf_wind = capacity_from_wind.(wind_speed; TSP=TSP_D52, Cp=Cp_D52, v_out=v_out, α=α_D52)
     project = Project(lifetime, discount_rate, timestep, "€")
   gen = ProductionUnit(sizing.Cgen,
       fuel_intercept, fuel_slope, fuel_price,
@@ -117,6 +119,17 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
 
         return oper_traj, oper_stats, mg_costs
     end
+    function simulate_pnl(mg::Microgrid, dispatch::Function,Pnl_request::Vector{Float64},ε::Real=0.0)
+        # Run the microgrid operation
+        oper_traj = operation_pnl(mg, dispatch,Pnl_request)
+        # Aggregate the operation variables
+        oper_stats = aggregation(mg, oper_traj, ε)
+
+        # Eval the microgrid costs
+        mg_costs = economics(mg, oper_stats)
+
+        return oper_traj, oper_stats, mg_costs
+    end
     
 # to update
     function save_mg(mg::Microgrid , stats::OperationStats, traj::OperationTraj, path::String,mg_name::String)
@@ -143,7 +156,7 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
         sizing= Sizing(sizing_df[1,1],sizing_df[1,2],sizing_df[1,3],sizing_df[1,4],sizing_df[1,5],sizing_df[1,6],sizing_df[1,7],sizing_df[1,8],0.0)
         
         traj_df = DataFrame(CSV.File(project_path*"/traj.csv"))
-        traj= OperationTraj(traj_df[:,1],traj_df[:,2],traj_df[:,3],traj_df[:,4],traj_df[:,5],traj_df[:,6],traj_df[:,7],traj_df[:,8],traj_df[:,9],traj_df[:,10],traj_df[:,11],traj_df[:,12],)
+        traj= OperationTraj(traj_df[:,1],traj_df[:,2],traj_df[:,3],traj_df[:,4],traj_df[:,5],traj_df[:,6],zeros(8760),traj_df[:,7],traj_df[:,8],traj_df[:,9],traj_df[:,10],traj_df[:,11],traj_df[:,12],)
        
         if sizing.Ftank>0.0
             a = traj.LoF[1]/sizing.Ftank

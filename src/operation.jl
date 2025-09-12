@@ -471,6 +471,133 @@ function operation(mg::Microgrid, dispatch::Function)
     return oper_traj
 end
 
+function operation_pnl(mg::Microgrid, dispatch::Function,Pnl_request::Vector{Float64})
+    # Type of all variables: Float64 or ForwardDiff.Dual{...}
+    Topt = typeof(mg).parameters[1]
+
+    # Renewable power generation
+    # (remark on naming convention: all non-dispatchable sources are assumed renewable!)
+    
+
+    # Desired net load
+
+    # Fixed parameters and short aliases
+    K = length(mg.load)
+    renew_potential = zeros(Topt,K)
+    dt = mg.project.timestep
+
+    n_gen = length(mg.dispatchables.generator)
+    Pgen_max = collect(gen.power_rated for gen in mg.dispatchables.generator)
+    Pgen_min = collect(mg.dispatchables.generator[i].minimum_load_ratio * Pgen_max[i] for i in eachindex(Pgen_max) )
+    fuel_slope = collect(gen.consumption_slope for gen in mg.dispatchables.generator)
+    fuel_intercept = collect(gen.consumption_intercept for gen in mg.dispatchables.generator)
+
+    LoF_max = mg.tanks.fuelTank.max_filling_ratio * mg.tanks.fuelTank.capacity
+    LoF_min = mg.tanks.fuelTank.min_filling_ratio * mg.tanks.fuelTank.capacity
+
+    Esto_max = mg.storage.energy_rated
+    Esto_min = mg.storage.SoC_min * Esto_max
+    Psto_pmax =  mg.storage.discharge_rate * Esto_max
+    Psto_pmin = -mg.storage.charge_rate * Esto_max # <0 in line with the generator convention for Psto
+    sto_loss = mg.storage.loss_factor
+
+    n_elyz = length(mg.electrolyzer)
+    Pelyz_max = collect(el.power_rated for el in mg.electrolyzer)
+    Pelyz_min = collect(mg.electrolyzer[i].minimum_load_ratio * Pelyz_max[i] for i in eachindex(Pelyz_max) )
+    prod_rate = collect(el.consumption_slope for el in mg.electrolyzer)
+
+    n_fc = length(mg.dispatchables.fuel_cell)
+    Pfc_max = collect(fc.power_rated for fc in mg.dispatchables.fuel_cell)
+    Pfc_min = collect(mg.dispatchables.fuel_cell[i].minimum_load_ratio * Pfc_max[i] for i in eachindex(Pfc_max) )
+    cons_rate = collect(fc.consumption_slope for fc in mg.dispatchables.fuel_cell)
+
+    LoH_max = mg.tanks.h2Tank.max_filling_ratio * mg.tanks.h2Tank.capacity
+    LoH_min = mg.tanks.h2Tank.min_filling_ratio * mg.tanks.h2Tank.capacity
+
+    # Initialization of loop variables
+    Pnl = zeros(Topt,K)
+    
+    Pgen = zeros(Topt,K,n_elyz)
+    Pgen_dmax = zeros(Topt, n_gen) 
+    Pgen_emax = zeros(Topt, n_gen)
+    
+    Esto = zeros(Topt,K+1)
+    Psto = zeros(Topt,K)
+
+    Pspill = zeros(Topt,K)
+    Pshed = zeros(Topt,K)
+    Pdump = zeros(Topt,K)
+
+    Pelyz = zeros(Topt,K, n_elyz)
+    Pelyz_emax = zeros(Topt, n_elyz) 
+    Pelyz_cmax = zeros(Topt, n_elyz)
+
+    Pfc = zeros(Topt,K, n_fc)
+    Pfc_emax = zeros(Topt, n_fc) 
+    Pfc_pmax = zeros(Topt, n_fc)
+
+    Phb = zeros(Topt,K)
+    LoH = zeros(Topt,K+1)
+    LoF = zeros(Topt,K+1)
+
+    # Initial battery storage state
+    Esto_ini = mg.storage.SoC_ini * mg.storage.energy_rated
+    Esto[1] = Esto_ini
+
+    # Initial H2 storage state
+    LoH_ini = mg.tanks.h2Tank.ini_filling_ratio * mg.tanks.h2Tank.capacity
+    LoH[1] = LoH_ini
+
+    # Initial fuel tank state
+    LoF_ini = mg.tanks.fuelTank.ini_filling_ratio * mg.tanks.fuelTank.capacity
+    LoF[1] = LoF_ini
+
+   
+  
+    for k=1:K
+        # Storage energy and power limits 
+        Psto_emin = - (Esto_max - Esto[k]) / ((1 - sto_loss) * dt)
+        Psto_emax = (Esto[k] - Esto_min) / ((1 + sto_loss) * dt)
+        Psto_dmax = min(Psto_emax, Psto_pmax)
+        Psto_cmax = max(Psto_emin, Psto_pmin)
+        
+        # Electrolyzers power limits
+        Pelyz_emax .=  prod_rate .* ((LoH_max - LoH[k]) * dt)
+        Pelyz_cmax .=  min.(Pelyz_emax,Pelyz_max)
+
+        # fuel_cells power limits
+        Pfc_emax .=  max.(dt * (LoH[k] - LoH_min) ./ cons_rate , 0.0 ) 
+        Pfc_pmax .=  min.(Pfc_emax,Pfc_max) 
+
+        # Diesel generators power limits 
+        Pgen_emax .= ((LoF[K] - LoF_min)/dt .- fuel_intercept.* Pgen_max )./ (fuel_slope)
+        Pgen_dmax .=  min.(Pgen_emax,Pgen_max)
+
+        # dispatch
+        Pnl[k], Pgen[k,1], Psto[k], Pspill[k], Pshed[k], Pdump[k], Pelyz[k,1], Pfc[k,1] = dispatch(Pnl_request[k], Psto_cmax, Psto_dmax, Pgen_min[1], Pgen_dmax[1],  Pelyz_min[1],Pelyz_cmax[1], Pfc_min[1],Pfc_pmax[1])
+
+        # Battery storage dynamics
+        Esto[k+1] = Esto[k] - (Psto[k] + sto_loss * abs(Psto[k])) * dt
+
+        # Hydrogen storage dynamics
+        LoH[k+1] = LoH[k] + (
+                sum(Pelyz[k,i]/prod_rate[i] for i in eachindex(prod_rate)) -
+                sum(Pfc[k,i]*cons_rate[i] for i in eachindex(cons_rate))
+            ) * dt
+
+        # fuel storage dynamics
+        LoF[k+1] = LoF[k] - sum(
+                Pgen[k,i] / fuel_slope[i] + fuel_intercept[i]* Pgen_max[i]
+                for i in eachindex(fuel_slope)
+            ) * dt
+
+    end
+
+    oper_traj = OperationTraj(Pnl, Pshed, renew_potential, Pgen[:,1], Pfc[:,1], Pelyz[:,1],Phb[:,1], Esto, Psto, LoH, LoF, Pspill,Pdump)
+    
+    return oper_traj
+end
+
 """
 aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=1.0)
 

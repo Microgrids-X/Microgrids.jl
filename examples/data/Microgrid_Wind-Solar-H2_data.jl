@@ -121,7 +121,7 @@ output_unit_hb="Kg"
 # Battery energy storage
 energy_rated_sto = 5000. # rated energy capacity (kWh)
 investment_price_sto = 350. # initial investiment price ($/kWh)
-om_price_sto = 10. # operation and maintenance price ($/kWh/y)
+om_price_sto =10. # operation and maintenance price ($/kWh/y)
 lifetime_sto = 15. # calendar lifetime (y)
 lifetime_cycles = 3000. # maximum number of cycles over life (1)
 # Parameters with default values
@@ -166,3 +166,6 @@ lifetime_wind = 25. # lifetime (y)
 default_sizing= Sizing( 0.0, 5000.,  5000., 1800.,  2000., 1800.,  12000., 0.0,0.0)
 capex_def=[400., 0.0, 1600., 500., 1600., 350., 1200., 3500.]
 ini_filling_state=[0.0,0.0,0.0];
+Eol=0.9
+deg_ratio_rt=1.5e-6/0.7 # 10 μV*/h same ratio as Morin
+deg_ratio_st=14e-6/0.7 # 106 μV*/h same ratio as Morin

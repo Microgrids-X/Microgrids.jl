@@ -10,8 +10,8 @@ This file must be included after the instructions:
 Simulate the performance of a Microgrid project 
 Returns mg, traj, stats, costs
 """
-    function simulate_microgrid(x=X,capex=capex_def,dispatch=dispatch_1)
-     mg=new_microgrid(x)
+    function simulate_microgrid(x=X,capex=capex_def,dispatch=dispatch_1,load=Pload,cf_pv=Ppv1k,wind=cf_wind)
+     mg=new_microgrid(Sizing(x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9]),capex,ini_filling_state,load,wind,cf_pv)
     # Split decision variables (converted MW → kW):
     oper_traj = operation(mg, dispatch)
     if mg.tanks.h2Tank.capacity>0.0
@@ -27,7 +27,7 @@ Returns mg, traj, stats, costs
     end
     
     ini=[0.0,a,b]
-    mg=new_microgrid(x,capex,ini)
+    mg=new_microgrid(Sizing(x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9]),capex,ini,load,wind,cf_pv)
     # Launch simulation:
     traj, stats, costs = simulate(mg,dispatch)
 

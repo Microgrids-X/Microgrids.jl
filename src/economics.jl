@@ -257,8 +257,15 @@ function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_un
     fuel_annual = prod_unit.combustible_price * prod_unit_cons
 
     # effective production unit  lifetime (in years)
+    """
     if prod_unit_hours > 0.0 || prod_unit_starts >0.0
     lifetime = min(prod_unit.lifetime_hours / prod_unit_hours,prod_unit.lifetime_on_off / prod_unit_starts, prod_unit.lifetime_calendar)
+    else
+    lifetime = prod_unit.lifetime_calendar
+    end
+    """
+    if prod_unit_hours > 0.0 
+    lifetime = min((1-Eol) /( prod_unit_hours*deg_ratio_rt + prod_unit_starts*deg_ratio_st), prod_unit.lifetime_calendar)
     else
     lifetime = prod_unit.lifetime_calendar
     end
