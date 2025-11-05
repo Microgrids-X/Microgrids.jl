@@ -1,4 +1,4 @@
-td = collect((0:nsteps-1)/24);
+ td = collect((0:nsteps-1)/24);
 
 """
 This file must be included after the instructions:
@@ -7,49 +7,15 @@ This file must be included after the instructions:
 """
 
 """
-Simulate the performance of a Microgrid project 
-Returns mg, traj, stats, costs
-"""
-    function simulate_microgrid(x=X,capex=capex_def,dispatch=dispatch_1,load=Pload,cf_pv=Ppv1k,wind=cf_wind)
-     mg=new_microgrid(Sizing(x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9]),capex,ini_filling_state,load,wind,cf_pv)
-    # Split decision variables (converted MW → kW):
-    oper_traj = operation(mg, dispatch)
-    if mg.tanks.h2Tank.capacity>0.0
-        a = oper_traj.LoH[end]/mg.tanks.h2Tank.capacity
-    else
-        a=0.0
-    end
-   
-    if mg.storage.energy_rated >0.0
-         b = oper_traj.Ebatt[end]/mg.storage.energy_rated
-    else
-        b=0.0
-    end
-    
-    ini=[0.0,a,b]
-    mg=new_microgrid(Sizing(x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9]),capex,ini,load,wind,cf_pv)
-    # Launch simulation:
-    traj, stats, costs = simulate(mg,dispatch)
-
-    return  mg, traj ,stats, costs
-end
-
-"""
 Plot the instantaneous power sharing of a microgrid furing one year
 plot_oper_traj(mg, oper_traj)
 """
 function plot_oper_traj(mg, oper_traj)
-    """
- ns=Int64(nsteps/730)
-     z=zeros(Float64,ns)
-tm=zeros(Float64,ns +1)
-   tm[end]=nsteps/24
-    for i=1:ns
-        z[i]= oper_traj.LoH[i*730+1]
-        tm[i]=(i-1)*730/24 
-    end
-    """
-    fig,( ax1, ax2) = plt.subplots(2,1)
+    
+   
+    
+    fig,( ax1, ax2) = plt.subplots(2,1,sharex=true)
+
     y1 = min.(oper_traj.Prenew_pot,mg.load)
     y2 = max.( oper_traj.Pbatt,0.0)
     y3 = oper_traj.Pfc
@@ -59,8 +25,8 @@ tm=zeros(Float64,ns +1)
     y7 = oper_traj.power_curtailment
     
  
-        y=np.vstack([y1,y2,y3,y4,y5,y6,y7])
-        fieldNames =(["Pren used by the load","battery_discharge","fuel cell","battery_charge", "elyz","shedding","spillage"])
+    y=np.vstack([y1,y2,y3,y4,y5,y6,y7])
+    fieldNames =(["Pren used by the load","battery_discharge","fuel cell","battery_charge", "elyz","shedding","spillage"])
     
     fieldColors = (["orange","mediumseagreen","hotpink","seagreen","orchid","black","red"])
          
@@ -95,6 +61,8 @@ tm=zeros(Float64,ns +1)
     ax2.grid(true)
     ax2.set(ylabel="kg")
     
+
+
        fig.tight_layout()  
        pygui(true)
        plt.show()
@@ -102,7 +70,7 @@ tm=zeros(Float64,ns +1)
     
 end
 
-function comp_oper_traj(mg1,mg2, oper_traj1, oper_traj2, costs1,costs2)
+function comp_oper_traj(mg1,mg2, oper_traj1, oper_traj2)
  
     ns=Int64(nsteps/730)
        z=zeros(Float64,ns)

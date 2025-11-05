@@ -269,7 +269,13 @@ function component_costs(prod_unit::ProductionUnit, mg_project::Project, prod_un
     else
     lifetime = prod_unit.lifetime_calendar
     end
-
+   """
+    if prod_unit_hours > 0.0 
+    lifetime = min(prod_unit.lifetime_hours / prod_unit_hours, prod_unit.lifetime_calendar)
+    else
+    lifetime = prod_unit.lifetime_calendar
+    end
+    """
     c,cashflow = component_costs(
         mg_project, lifetime,
         investment, replacement, salvage,
@@ -283,13 +289,13 @@ end
 
 Compute net present cost factors for a `Tank`.
 """
-function component_costs(tank::Tank, mg_project::Project)
+function component_costs(tank::Tank, mg_project::Project,dif::Float64)
     rating = tank.capacity
-    investment = tank.investment_price * rating + (tank.ini_filling_ratio * tank.combustible_price * rating )
+    investment = tank.investment_price * rating + (tank.ini_filling_ratio * tank.combustible_price * rating ) 
     replacement = investment * tank.replacement_price_ratio
     salvage = investment * tank.salvage_price_ratio
     om_annual = tank.om_price * rating
-    fuel_annual = 0.0
+    fuel_annual = dif * tank.combustible_price
 
     c, cashflow = component_costs(
         mg_project, tank.lifetime,
@@ -408,7 +414,7 @@ function economics(mg::Microgrid, oper_stats::OperationStats)
     elyz_costs, elyz_cashflow = component_costs(mg.electrolyzer[1], mg.project, oper_stats.elyz_hours,oper_stats.elyz_starts,oper_stats.elyz_consumed_energy)
     fc_costs,fc_cashflow = component_costs(mg.dispatchables.fuel_cell[1], mg.project, oper_stats.fc_hours,oper_stats.fc_starts,oper_stats.h2_consumed)
     fuel_tank_cost,fuel_tank_cashflow = component_costs(mg.tanks.fuelTank, mg.project)
-    h2_tank_cost ,h2_tank_cashflow = component_costs(mg.tanks.h2Tank, mg.project)
+    h2_tank_cost ,h2_tank_cashflow = component_costs(mg.tanks.h2Tank, mg.project,oper_stats.fc_consumed_h2-oper_stats.elyz_produced_h2)
     hb_costs,hb_cashflow = component_costs(mg.haber_bosch, mg.project, oper_stats.hb_hours,oper_stats.hb_starts,oper_stats.hb_cons_el)
     # Energy storage
     sto_costs, sto_cashflow = component_costs(mg.storage, mg.project, oper_stats)

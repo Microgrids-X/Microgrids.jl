@@ -18,12 +18,14 @@ module Microgrids
     include("production.jl")
     include("operation.jl")
     include("economics.jl")
+    
     include("../examples/data/Microgrid_Wind-Solar-H2_data.jl")
+
 
 
     import Base.@kwdef # backport Julia 1.9 syntax to 1.6-1.8 versions
 
-    export simulate,save_mg,load_mg,new_microgrid,simulate_pnl,
+    export simulate,save_mg,load_mg,new_microgrid,simulate_pnl,simulate_double,
         NonDispatchableSource, ProductionUnit, Tank, TankCompound, 
         Project, Sizing,DispatchableCompound,Battery, Photovoltaic, PVInverter, WindPower, Microgrid,
         capacity_from_wind,
@@ -41,8 +43,8 @@ module Microgrids
 """
         
 function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=capex_def,initial_fill_rate::Vector{Float64}=ini_filling_state,load::Vector{Float64}=Pload,
-    wind_speed::Vector{Float64}=wind_speed,irradiance::Vector{Float64}=irradiance)
-    cf_wind = capacity_from_wind.(wind_speed; TSP=TSP_D52, Cp=Cp_D52, v_out=v_out, α=α_D52)
+    cf_wind::Vector{Float64}=cf_wind,irradiance::Vector{Float64}=irradiance)
+    
     project = Project(lifetime, discount_rate, timestep, "€")
   gen = ProductionUnit(sizing.Cgen,
       fuel_intercept, fuel_slope, fuel_price,
@@ -131,7 +133,45 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
         return oper_traj, oper_stats, mg_costs
     end
     
-# to update
+    
+"""
+Simulate the performance of a Microgrid project 
+Returns mg, traj, stats, costs
+"""
+    function simulate_double(mg=mg,capex=capex_def,dispatch=dispatch_1)
+
+    # Split decision variables (converted MW → kW):
+    oper_traj = operation(mg, dispatch)
+    if mg.tanks.h2Tank.capacity>0.0
+        a = oper_traj.LoH[end]/mg.tanks.h2Tank.capacity
+    else
+        a=0.0
+    end
+   
+    if mg.storage.energy_rated >0.0
+         b = oper_traj.Ebatt[end]/mg.storage.energy_rated
+    else
+        b=0.0
+    end
+    
+    ini=[0.0,a,b]
+    sizes=Sizing(mg.dispatchables.generator[1].power_rated,mg.storage.energy_rated,mg.nondispatchables[1].power_rated,mg.nondispatchables[2].power_rated,
+        mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity,mg.haber_bosch.power_rated)
+
+
+        load= mg.load
+        wind= mg.nondispatchables[2].capacity_factor
+        cf_pv= mg.nondispatchables[1].irradiance
+
+    mg=new_microgrid(sizes,capex,ini,load,wind,cf_pv)
+    # Launch simulation:
+    traj, stats, costs = simulate(mg,dispatch)
+
+    return  mg, traj ,stats, costs
+end
+
+
+# to be updated
     function save_mg(mg::Microgrid , stats::OperationStats, traj::OperationTraj, path::String,mg_name::String)
         mkdir(mg_name)
         proj_path=path*mg_name*"/"
@@ -139,7 +179,7 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
         size_frame=DataFrame(Cgen=Float64[],
         Cbatt=Float64[],Cpv=Float64[],Cwind=Float64[],Cfc=Float64[],Cel=Float64[],Htank=Float64[],Ftank=Float64[],Hb=Float64[])
         push!(size_frame,(mg.dispatchables.generator[1].power_rated,mg.storage.energy_rated,mg.nondispatchables[1].power_rated,mg.nondispatchables[2].power_rated,
-        mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity,0.0))
+        mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity,mg.haber_bosch.power_rated))
         CSV.write(proj_path*"sizing.csv",size_frame)
 
         op_frame=DataFrame([name => [] for name in propertynames(stats)])
@@ -153,11 +193,12 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
 
     function load_mg(project_path :: String)
         sizing_df = DataFrame(CSV.File(project_path*"/sizing.csv"))
-        sizing= Sizing(sizing_df[1,1],sizing_df[1,2],sizing_df[1,3],sizing_df[1,4],sizing_df[1,5],sizing_df[1,6],sizing_df[1,7],sizing_df[1,8],0.0)
+        #sizing= Sizing(sizing_df[1,1],sizing_df[1,2],sizing_df[1,3],sizing_df[1,4],sizing_df[1,5],sizing_df[1,6],sizing_df[1,7],sizing_df[1,8],0.0)
+        sizing= Sizing(sizing_df[1,:]...)
         
         traj_df = DataFrame(CSV.File(project_path*"/traj.csv"))
-        traj= OperationTraj(traj_df[:,1],traj_df[:,2],traj_df[:,3],traj_df[:,4],traj_df[:,5],traj_df[:,6],zeros(8760),traj_df[:,7],traj_df[:,8],traj_df[:,9],traj_df[:,10],traj_df[:,11],traj_df[:,12],)
-       
+       # traj= OperationTraj(traj_df[:,1],traj_df[:,2],traj_df[:,3],traj_df[:,4],traj_df[:,5],traj_df[:,6],traj_df[:,7],traj_df[:,8],traj_df[:,9],traj_df[:,10],traj_df[:,11],traj_df[:,12],traj_df[:,13])
+       traj=OperationTraj(eachcol(traj_df)...)
         if sizing.Ftank>0.0
             a = traj.LoF[1]/sizing.Ftank
         else

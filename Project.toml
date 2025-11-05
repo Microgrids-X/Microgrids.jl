@@ -9,6 +9,8 @@ DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
 IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
+NumPyArrays = "359eecd2-3036-4797-89e9-498f868f96c0"
 
 [compat]
+NumPyArrays = "0.1.1"
 julia = "1.6"
