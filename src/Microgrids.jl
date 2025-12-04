@@ -38,12 +38,12 @@ module Microgrids
     Create a Microgrid of size `x`
     with x=[energy_rated_sto, power_rated_pv, power_rated_wind, power_rated_elyz, power_rated_fc, capacity_rated_hy_tank]
     You can also specify capex prices and initial filling rate of either Hydrogen tank or batteries.
-    new_microgrid(x::Vector{Float64}= X,capex::Vector{Float64}=capex_def,initial_fill_rate::Vector{Float64})
+    new_microgrid(x::Vector{Float32}= X,capex::Vector{Float32}=capex_def,initial_fill_rate::Vector{Float32})
 
 """
         
-function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=capex_def,initial_fill_rate::Vector{Float64}=ini_filling_state,load::Vector{Float64}=Pload,
-    cf_wind::Vector{Float64}=cf_wind,irradiance::Vector{Float64}=irradiance)
+function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float32}=capex_def,initial_fill_rate::Vector{Float32}=ini_filling_state,load::Vector{Float32}=Pload,
+    cf_wind::Vector{Float32}=cf_wind,irradiance::Vector{Float32}=irradiance)
     
     project = Project(lifetime, discount_rate, timestep, "€")
   gen = ProductionUnit(sizing.Cgen,
@@ -57,8 +57,8 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
               load_min_ratio_fc,replacement_price_ratio, salvage_price_ratio,input_unit_fc,output_unit_fc)
   hytank = Tank(sizing.Htank,capex[4], om_price_hytank,lifetime_hytank,loss_factor_hytank,initial_fill_rate[2],
               LoH_min_ratio, LoH_max_ratio,hy_price,replacement_price_ratio, salvage_price_ratio)
-  dispatchables = DispatchableCompound{Float64}([gen], [fuel_cell])
-     tanks = TankCompound{Float64}(ftank,hytank)
+  dispatchables = DispatchableCompound{Float32}([gen], [fuel_cell])
+     tanks = TankCompound{Float32}(ftank,hytank)
 
   elyz = ProductionUnit(sizing.Cel,cons_intercept_elyz,cons_rate_elyz,cons_price_elyz, capex[5], om_price_hour_elyz,om_price_elyz, lifetime_elyz_y,lifetime_elyz_h,lifetime_elyz_starts,
   load_min_ratio_elyz,replacement_price_ratio, salvage_price_ratio,input_unit_elyz,output_unit_elyz)
@@ -121,7 +121,8 @@ function new_microgrid(sizing::Sizing = default_sizing,capex::Vector{Float64}=ca
 
         return oper_traj, oper_stats, mg_costs
     end
-    function simulate_pnl(mg::Microgrid, dispatch::Function,Pnl_request::Vector{Float64},ε::Real=0.0)
+    
+    function simulate_pnl(mg::Microgrid, dispatch::Function,Pnl_request::Vector{Float32},ε::Real=0.0)
         # Run the microgrid operation
         oper_traj = operation_pnl(mg, dispatch,Pnl_request)
         # Aggregate the operation variables
@@ -176,8 +177,8 @@ end
         mkdir(mg_name)
         proj_path=path*mg_name*"/"
         nsteps=Int(length(mg.load)/mg.project.timestep)
-        size_frame=DataFrame(Cgen=Float64[],
-        Cbatt=Float64[],Cpv=Float64[],Cwind=Float64[],Cfc=Float64[],Cel=Float64[],Htank=Float64[],Ftank=Float64[],Hb=Float64[])
+        size_frame=DataFrame(Cgen=Float32[],
+        Cbatt=Float32[],Cpv=Float32[],Cwind=Float32[],Cfc=Float32[],Cel=Float32[],Htank=Float32[],Ftank=Float32[],Hb=Float32[])
         push!(size_frame,(mg.dispatchables.generator[1].power_rated,mg.storage.energy_rated,mg.nondispatchables[1].power_rated,mg.nondispatchables[2].power_rated,
         mg.dispatchables.fuel_cell[1].power_rated,mg.electrolyzer[1].power_rated,mg.tanks.h2Tank.capacity,mg.tanks.fuelTank.capacity,mg.haber_bosch.power_rated))
         CSV.write(proj_path*"sizing.csv",size_frame)

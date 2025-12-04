@@ -57,7 +57,7 @@ function capacity_from_wind(v::Real; TSP::Real, Cp=0.50, v_out=25.0, α=3.0)
     if v > v_out
         cf = 0.0
     end
-    return cf
+    return Float32(cf)
 end
 
 """

@@ -291,7 +291,7 @@ end
 
 Allow to operate running statistics of production units
 """
-function usage!(prod_unit_power::Float64,prod_unit::ProductionUnit,hours::Float64,cons::Float64,minP::Float64,dt::Float64,c1::Float64,max_rt::Float64,min_rt::Float64,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
+function usage!(prod_unit_power,prod_unit::ProductionUnit,hours::Float64,cons,minP,dt::Float32,c1::Float64,max_rt::Float64,min_rt,r_u_2::Int64,r_o_2::Int64,cr::Float64,n_starts::Int64,ε::Real=0.0)
     Pprod_unit_max = prod_unit.power_rated
     Pprod_unit_eps = Pprod_unit_max*1e-5
     prod_unit_intercept = prod_unit.consumption_intercept
@@ -649,7 +649,7 @@ function aggregation(mg::Microgrid, oper_traj::OperationTraj, ε::Real=0.0)
     
     LoHfin = oper_traj.LoH[end]
     LoHini = oper_traj.LoH[1]
-    chain_loss =  elyz_consumed_energy - fc_produced_energy -(LoHfin-LoHini)*mg.dispatchables.fuel_cell[1].consumption_slope
+    chain_loss =  elyz_consumed_energy - fc_produced_energy -(LoHfin-LoHini)*mg.dispatchables.fuel_cell[1].consumption_slope # pas très pertinent, à revoir
      # Haber-bosch statistics 
      hb_cons_el = sum(oper_traj.Phb) * dt
      hb_prod = hb_cons_el / mg.haber_bosch.consumption_slope

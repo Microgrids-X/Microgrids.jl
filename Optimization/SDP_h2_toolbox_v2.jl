@@ -59,7 +59,7 @@ end
 
 TBW
 """
-function time_dyn_backward!(time::Array{Float64,1}, dt::Float64, mi_l::Vector{Int64})
+function time_dyn_backward!(time::Array{Float64,1}, dt, mi_l::Vector{Int64})
 
     if time[1] > 0
         next_hi = time[1] - dt
@@ -331,7 +331,7 @@ function dynamic(x::State, Pbt::Float64,Pnl_next::Float64, mg)
         PH2 = max(Pel_max, Pnl - Pbt)
         LoH_next = x.LoH - PH2 / el.consumption_slope * dt
         
-        if (PH2<1e-12)
+        if (PH2<-1e-12)
             δ_next = -1
         end
 
@@ -428,7 +428,7 @@ function dispatch_1(s::State, mg::Microgrid)
     return Pbatt, Pfc - Pelyz
 end
 
-function cost_to_go(pen::Float64,Pshed::Float64,Ph2::Float64,Pbt::Float64,δ::Int64,fc::ProductionUnit,el::ProductionUnit,bt::Battery,d_rt::Float64,d_st::Float64)
+function cost_to_go(pen::Float64,Pshed::Float64,Ph2::Float64,Pbt::Float64,δ::Int64,fc::ProductionUnit,el::ProductionUnit,bt::Battery,d_rt,d_st)
     c=0
     c+= pen * max(0.0, Pshed)
     if Ph2> ( 10e-12)
@@ -710,7 +710,7 @@ function DP_jopt(K::Int64, pen::Float64,Pnl::Vector{Float64},mg,d_rt::Float64=de
 
 end
 
-function DPrecursion_jopt_mc(K::Int64, pen::Float64, time_init::Vector{Float64}, mi_l::Vector{Int64}, Pnl_cate, Pnl_prob, mg,d_rt::Float64=deg_ratio_rt,d_st::Float64=deg_ratio_st;mode::Int64=1)
+function DPrecursion_jopt_mc(K::Int64, pen::Float64, time_init::Vector{Float64}, mi_l::Vector{Int64}, Pnl_cate, Pnl_prob, mg,d_rt=deg_ratio_rt,d_st=deg_ratio_st;mode::Int64=1)
 
     bt = mg.storage
     hytank = mg.tanks.h2Tank
@@ -1184,7 +1184,7 @@ function Dp_simu(Jopt, n, pen, mg1,Pnl::Vector{Float64},d_rt::Float64=deg_ratio_
 end
 
 
-function sdp_simu_jopt_mc(Jopt, n, pen, mg1, Pnl_cate, Pnl_prob,Pnl,d_rt::Float64=deg_ratio_rt,d_st::Float64=deg_ratio_st;mode::Int64=1,data=data)
+function sdp_simu_jopt_mc(Jopt, n, pen, mg1, Pnl_cate, Pnl_prob,Pnl,d_rt=deg_ratio_rt,d_st=deg_ratio_st;mode::Int64=1,data=data)
    
    
    el=mg1.electrolyzer[1]
@@ -1311,7 +1311,7 @@ function sdp_simu_jopt_mc(Jopt, n, pen, mg1, Pnl_cate, Pnl_prob,Pnl,d_rt::Float6
 
 
     end
-    traj = OperationTraj(Pnl, Pshed, Pren, Pgen, Pfc, Pel, Phb, Ebt, Pbt, Loh, Lof, Pspill, Pdump)
+    traj = OperationTraj(Float64.(Pnl), Pshed, Float64.(Pren), Pgen, Pfc, Pel, Phb, Ebt, Pbt, Loh, Lof, Pspill, Pdump)
     stats = aggregation(mg1, traj)
     # Eval the microgrid costs
     costs = economics(mg1, stats)
