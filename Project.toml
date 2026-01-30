@@ -1,7 +1,8 @@
 name = "Microgrids"
 uuid = "bd581358-d3fa-499e-a26e-e70307242c03"
 authors = ["Pierre Haessig <pierre.haessig@centralesupelec.fr>",
-           "evelisea <59697806+evelisea@users.noreply.github.com>"]
+           "evelisea <59697806+evelisea@users.noreply.github.com>",
+           "Niels Thobie <niels.thobie@ens-rennes.fr>"]
 version = "0.11.1"
 
 [compat]
